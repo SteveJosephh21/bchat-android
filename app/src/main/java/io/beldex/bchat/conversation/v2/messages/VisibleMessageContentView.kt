@@ -28,7 +28,6 @@ import android.widget.Toast
 import androidx.annotation.ColorInt
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -266,7 +265,7 @@ class VisibleMessageContentView : MaterialCardView {
             binding.quoteView.root.bind(
                 quote.author.toString(), quoteText, quote.attachment, thread,
                 message.isOutgoing, message.isOpenGroupInvitation, message.isPayment,
-                message.isOutgoing, message.threadId, quote.isOriginalMissing, glide, textWidth.toInt()
+                message.isOutgoing, message.threadId, quote.isOriginalMissing, glide, textWidth.toInt(),message.id
             )
             onContentClick.add { event ->
                 val r = Rect()

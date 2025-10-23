@@ -8,6 +8,11 @@ import android.util.TypedValue
 import android.view.View
 import android.widget.LinearLayout
 import androidx.annotation.ColorInt
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.colorResource
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
@@ -16,13 +21,16 @@ import androidx.core.text.toSpannable
 import androidx.core.view.isVisible
 import com.beldex.libbchat.messaging.contacts.Contact
 import com.beldex.libbchat.messaging.utilities.UpdateMessageData
+import com.beldex.libbchat.utilities.Address
 import com.beldex.libbchat.utilities.TextSecurePreferences
 import com.beldex.libbchat.utilities.recipients.Recipient
 import com.bumptech.glide.RequestManager
 import com.google.android.material.card.MaterialCardView
 import dagger.hilt.android.AndroidEntryPoint
 import io.beldex.bchat.R
-import io.beldex.bchat.compose_utils.TextColor
+import io.beldex.bchat.compose_utils.BChatTheme
+import io.beldex.bchat.conversation.v2.contact_sharing.ContactModel
+import io.beldex.bchat.conversation.v2.contact_sharing.ContactViewImage
 import io.beldex.bchat.conversation.v2.contact_sharing.capitalizeFirstLetter
 import io.beldex.bchat.conversation.v2.contact_sharing.flattenData
 import io.beldex.bchat.conversation.v2.utilities.MentionUtilities
@@ -90,7 +98,7 @@ class QuoteView @JvmOverloads constructor(context: Context, attrs: AttributeSet?
     fun bind(
         authorPublicKey: String, body: String?, attachments: SlideDeck?, thread: Recipient,
         isOutgoingMessage: Boolean, isOpenGroupInvitation: Boolean, isPayment: Boolean,
-        outgoing: Boolean, threadID: Long, isOriginalMissing: Boolean, glide: RequestManager, textWidth: Int = 0
+        outgoing: Boolean, threadID: Long, isOriginalMissing: Boolean, glide: RequestManager, textWidth: Int = 0, id: Long
     ) {
         // Author
         val author = contactDb.getContactWithBchatID(authorPublicKey)
@@ -108,6 +116,12 @@ class QuoteView @JvmOverloads constructor(context: Context, attrs: AttributeSet?
 
         /*------code section to handle sent contact inside quote view-------*/
         try {
+            binding.quoteViewSharedContactAuthorTextView.text = authorDisplayName.capitalizeFirstLetter()
+            binding.quoteViewSharedContactAuthorTextView.setTextColor(if(quoteIsLocalUser && !outgoing){
+                ResourcesCompat.getColor(resources, R.color.button_green, context.theme)
+            }else {
+                getTextColor(isOutgoingMessage)
+            })
             if (body != null && body.trim().startsWith("{")) {
                 val mainObject = JSONObject(body)
                 val uniObject = mainObject.optJSONObject("kind")
@@ -124,10 +138,10 @@ class QuoteView @JvmOverloads constructor(context: Context, attrs: AttributeSet?
                             binding.imgContactPerson.setColorFilter(ContextCompat.getColor(context, if(isOutgoingMessage) R.color.sent_quoted_text_color else R.color.received_message_text_color))
                         }
                     }
-
+                    binding.quoteContentTypeContainer.visibility = View.GONE
+                    binding.quoteViewAuthorTextView.visibility = View.GONE
                     if (mode == Mode.Regular) {
                         binding.quoteViewAttachmentPreviewContainer.visibility = View.GONE
-                        binding.quoteContentType.visibility = View.GONE
                         binding.container.orientation = LinearLayout.VERTICAL
                         binding.mainQuoteViewContainer.setBackgroundColor(
                             resources.getColor(getContainerColor(isOutgoingMessage), null)
@@ -167,6 +181,34 @@ class QuoteView @JvmOverloads constructor(context: Context, attrs: AttributeSet?
                                 params.width = maxPossibleWidth
                                 binding.contactView.layoutParams = params
                             }
+                            binding.contactViewImage.setContent {
+                                key(id) {
+                                    BChatTheme {
+                                        val contact= ContactModel(
+                                            address= Address.fromSerialized(data.address),
+                                            name=data.name
+                                        )
+
+                                        val cardBackgroundColor by remember(message) {
+                                            val backgroundColor=when {
+                                                isOutgoingMessage -> R.color.outgoing_call_background
+                                                !isOutgoingMessage -> R.color.quote_view_background
+                                                else -> R.color.outgoing_call_background
+                                            }
+                                            mutableIntStateOf(
+                                                backgroundColor
+                                            )
+                                        }
+
+                                        ContactViewImage(
+                                            contacts=listOf(
+                                                contact
+                                            ),
+                                            backgroundColor=colorResource(cardBackgroundColor)
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                     return
@@ -175,8 +217,9 @@ class QuoteView @JvmOverloads constructor(context: Context, attrs: AttributeSet?
 
             // If not JSON or type isn’t SharedContact → fallback
             binding.contactView.visibility = View.GONE
+            binding.quoteContentTypeContainer.visibility = View.VISIBLE
+            binding.quoteViewAuthorTextView.visibility = View.VISIBLE
             if (mode == Mode.Regular) {
-                binding.quoteContentType.visibility = View.VISIBLE
                 binding.container.orientation = LinearLayout.HORIZONTAL
             } else {
                 binding.quoteGroup.visibility = View.VISIBLE
@@ -185,8 +228,9 @@ class QuoteView @JvmOverloads constructor(context: Context, attrs: AttributeSet?
         } catch (e: JSONException) {
             e.printStackTrace()
             binding.contactView.visibility = View.GONE
+            binding.quoteContentTypeContainer.visibility = View.VISIBLE
+            binding.quoteViewAuthorTextView.visibility = View.VISIBLE
             if (mode == Mode.Regular) {
-                binding.quoteContentType.visibility = View.VISIBLE
                 binding.container.orientation = LinearLayout.HORIZONTAL
             } else {
                 binding.quoteGroup.visibility = View.VISIBLE
