@@ -63,8 +63,21 @@ class MessageSendJob(val message: Message, val destination: Destination) : Job {
                 if (storage.getAttachmentUploadJob(it.attachmentId.rowId) != null) {
                     // Wait for it to finish
                 } else {
-                    val job = AttachmentUploadJob(it.attachmentId.rowId, message.threadID!!.toString(), message, id!!)
-                    JobQueue.shared.add(job)
+                    Log.d("Status-Message rowId->", "${it.attachmentId.rowId}")
+                    Log.d("Status-Message threadId->", message.threadID.toString())
+                    Log.d("Status-Message message->", "${message}")
+                    Log.d("Status-Message id->", id!!)
+                    try {
+                        val job = AttachmentUploadJob(
+                            it.attachmentId.rowId,
+                            message.threadID!!.toString(),
+                            message,
+                            id!!
+                        )
+                        JobQueue.shared.add(job)
+                    } catch (ex: Exception) {
+                        Log.d("Status-Message exception -> ", ex.message.toString())
+                    }
                 }
             }
             if (attachmentsToUpload.isNotEmpty()) {

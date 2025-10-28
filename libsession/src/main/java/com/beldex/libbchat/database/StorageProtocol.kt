@@ -28,6 +28,8 @@ import com.beldex.libsignal.messages.SignalServiceAttachmentPointer
 import com.beldex.libsignal.messages.SignalServiceGroup
 import com.beldex.libbchat.messaging.messages.visible.Reaction
 import com.beldex.libbchat.messaging.messages.Message
+import com.beldex.libbchat.messaging.messages.signal.OutgoingMediaMessage
+import com.beldex.libbchat.messaging.messages.signal.OutgoingTextMessage
 
 
 interface StorageProtocol {
@@ -191,4 +193,6 @@ interface StorageProtocol {
     fun updateReactionIfNeeded(message: Message, sender: String, openGroupSentTimestamp: Long)
     fun deleteReactions(messageId: Long, mms: Boolean)
     fun deleteReactions(messageIds: List<Long>, mms: Boolean)
+    fun getMessageIdFromSMSDatabase(threadId: Long, outgoingTextMessage: OutgoingTextMessage, sentTimeStamp: Long?) : Long
+    fun getMessageIdFromMMSDatabase(threadId: Long, outgoingMediaMessage: OutgoingMediaMessage, sentTimeStamp: Long?) : Long
 }

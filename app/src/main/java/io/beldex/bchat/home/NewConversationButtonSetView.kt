@@ -409,5 +409,6 @@ interface NewConversationButtonSetViewDelegate {
     fun joinSocialGroup()
     fun openNewConversationChat()
     fun createNewSecretGroup()
+    fun createStatus()
 }
 // endregion

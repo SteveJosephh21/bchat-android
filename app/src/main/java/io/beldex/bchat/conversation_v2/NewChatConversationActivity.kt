@@ -23,6 +23,7 @@ import io.beldex.bchat.dms.NewChatScreen
 
 enum class OpenActivity(val destination: String) {
     NewChat("new_chat"),
+    Status("status_class"),
     SecretGroup("secret_group"),
     PublicGroup("open_group"),
     NoteToSelf("note-to-self"),
@@ -60,24 +61,27 @@ class NewChatConversationActivity: ComponentActivity() {
                                 OpenActivity.NewChat -> {
                                     openActivity(1, context)
                                 }
-                                OpenActivity.SecretGroup -> {
+                                OpenActivity.Status -> {
                                     openActivity(2, context)
                                 }
-                                OpenActivity.PublicGroup -> {
+                                OpenActivity.SecretGroup -> {
                                     openActivity(3, context)
                                 }
-                                OpenActivity.NoteToSelf -> {
+                                OpenActivity.PublicGroup -> {
                                     openActivity(4, context)
                                 }
-                                OpenActivity.InviteAFriend -> {
+                                OpenActivity.NoteToSelf -> {
                                     openActivity(5, context)
+                                }
+                                OpenActivity.InviteAFriend -> {
+                                    openActivity(6, context)
                                 }
                                 else -> return@NewChatScreen
                             }
                         },
                         openConversation = {
                             val returnIntent = Intent()
-                            returnIntent.putExtra(ConversationFragmentV2.ACTIVITY_TYPE,6)
+                            returnIntent.putExtra(ConversationFragmentV2.ACTIVITY_TYPE,7)
                             returnIntent.putExtra(ConversationFragmentV2.ADDRESS,it.address)
                             context.setResult(PassphraseRequiredActionBarActivity.RESULT_OK, returnIntent)
                             context.finish()

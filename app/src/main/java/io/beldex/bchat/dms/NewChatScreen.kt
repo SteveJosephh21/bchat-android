@@ -281,6 +281,16 @@ fun NewChatScreen(
                 })
                 NewChatItem(
                     image = if(isDarkTheme) R.drawable.ic_secret_group else R.drawable.ic_secret_group_light,
+                    title = "Create Status",
+                    MaterialTheme.appColors.textColor,
+                    PaddingValues(start = 10.dp, end = 10.dp, top = 5.dp),
+                    onClick = {
+                        openActivity(OpenActivity.Status)
+                    },
+                    onClickScanQRCode = {}
+                )
+                NewChatItem(
+                    image = if(isDarkTheme) R.drawable.ic_secret_group else R.drawable.ic_secret_group_light,
                     title = stringResource(id = R.string.home_screen_secret_groups_title),
                     MaterialTheme.appColors.textColor,
                     PaddingValues(start = 10.dp, end = 10.dp, top = 5.dp),

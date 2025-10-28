@@ -943,4 +943,21 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
             messageIds.map { MessageId(it, mms) }
         )
     }
+
+    override fun getMessageIdFromSMSDatabase(threadId: Long, outgoingTextMessage: OutgoingTextMessage, sentTimeStamp: Long?): Long {
+        val smsDb = DatabaseComponent.get(context).smsDatabase()
+        return smsDb.insertMessageOutbox(
+            threadId,
+            outgoingTextMessage,
+            false,
+            sentTimeStamp!!,
+            null,
+            true
+        )
+    }
+
+    override fun getMessageIdFromMMSDatabase(threadId: Long, outgoingMediaMessage: OutgoingMediaMessage, sentTimeStamp: Long?): Long {
+        val mmsDb = DatabaseComponent.get(context).mmsDatabase()
+        return mmsDb.insertMessageOutbox(outgoingMediaMessage, threadId, false, null, runThreadUpdate = true)
+    }
 }

@@ -123,8 +123,13 @@ import io.beldex.bchat.archivechats.ArchiveChatViewModel
 import io.beldex.bchat.conversation_v2.NewChatConversationActivity
 import io.beldex.bchat.conversation_v2.NewGroupConversationActivity
 import io.beldex.bchat.conversation_v2.NewGroupConversationType
+import io.beldex.bchat.conversation_v2.OpenActivity
 import io.beldex.bchat.databinding.FragmentHomeBinding
 import io.beldex.bchat.repository.ConversationRepository
+import io.beldex.bchat.status.Status
+import io.beldex.bchat.status.Status2
+import io.beldex.bchat.status.Status2Activity
+import io.beldex.bchat.status.StatusActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -1528,26 +1533,47 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
                     extras.putString(ConversationFragmentV2.BNS_NAME,result.data!!.getStringExtra(ConversationFragmentV2.BNS_NAME))
                     replaceFragment(ConversationFragmentV2(), null, extras)
                 }
-                2 -> { // Secret Group
+                2 -> {
+                    createStatus()
+                }
+                3 -> { // Secret Group
                     createNewSecretGroup()
                 }
-                3 -> { // Social Group
+                4 -> { // Social Group
                     joinSocialGroup()
                 }
-                4 -> { // Note to Self
+                5 -> { // Note to Self
                     val recipient = Recipient.from(requireContext(), Address.fromSerialized(hexEncodedPublicKey), false)
                     passGlobalSearchAdapterModelContactValue(recipient.address)
                 }
-                5 -> { // Invite a Friend
+                6 -> { // Invite a Friend
                     sendInvitation(hexEncodedPublicKey)
                 }
-                6 -> { // Individual Conversation
+                7 -> { // Individual Conversation
                     val extras = Bundle()
                     extras.putParcelable(ConversationFragmentV2.ADDRESS,result.data!!.parcelable(ConversationFragmentV2.ADDRESS))
                     replaceFragment(ConversationFragmentV2(),null,extras)
                 }
                 else -> return@registerForActivityResult
             }
+        }
+    }
+
+    override fun createStatus() {
+        val intent = Intent(requireContext(), Status2Activity::class.java).apply {
+            putExtra(Status2Activity.EXTRA_DESTINATION, Status2.Status2.destination)
+        }
+        createStatusActivityResultLauncher.launch(intent)
+    }
+
+    private var createStatusActivityResultLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val extras = Bundle()
+            extras.putLong(ConversationFragmentV2.THREAD_ID, result.data!!.getLongExtra(ConversationFragmentV2.THREAD_ID,-1))
+            extras.putParcelable(ConversationFragmentV2.ADDRESS,result.data!!.parcelable(ConversationFragmentV2.ADDRESS))
+            extras.putString(ConversationFragmentV2.STATUS_URL,result.data!!.getStringExtra(ConversationFragmentV2.STATUS_URL))
+            extras.putString(ConversationFragmentV2.STATUS_KEY,result.data!!.getStringExtra(ConversationFragmentV2.STATUS_KEY))
+            replaceFragment(ConversationFragmentV2(), null, extras)
         }
     }
 

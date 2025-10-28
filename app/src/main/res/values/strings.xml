@@ -182,6 +182,7 @@
 
     <!-- CropImageActivity -->
     <string name="CropImageActivity_profile_avatar" translatable="false">Photo</string>
+    <string name="status_avatar" translatable="false">Status Image</string>
 
     <!-- InputPanel -->C
     <string name="InputPanel_tap_and_hold_to_record_a_voice_message_release_to_send" translatable="false">Tap and hold to record a voice message, release to send</string>
@@ -1442,6 +1443,7 @@ Your wallet password can be used to access your wallet within BChat and authenti
     <string name="screen_inactivity_timeout">Screen Inactivity Timeout</string>
     <string name="title_activity_join_public_new_chat_screen">JoinPublicNewChatScreen</string>
     <string name="title_activity_create_secret_group_screen">CreateSecretGroupScreen</string>
+    <string name="title_activity_create_status_screen">CreateStatusScreen</string>
     <string name="title_activity_create_new_private_chat_screen">CreateNewPrivateChatScreen</string>
     <string name="title_activity_start_wallet_info_screen">StartWalletInfoScreen</string>
     <string name="about">About</string>

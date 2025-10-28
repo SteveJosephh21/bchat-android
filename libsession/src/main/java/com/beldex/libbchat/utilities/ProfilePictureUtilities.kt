@@ -16,11 +16,16 @@ import java.util.*
 
 object ProfilePictureUtilities {
 
-    fun upload(profilePicture: ByteArray, encodedProfileKey: String, context: Context): Promise<Unit, Exception> {
+    fun upload(
+        profilePicture: ByteArray,
+        encodedProfileKey: String,
+        context: Context
+    ): Promise<Unit, Exception> {
         val deferred = deferred<Unit, Exception>()
         ThreadUtils.queue {
             val inputStream = ByteArrayInputStream(profilePicture)
-            val outputStream = ProfileCipherOutputStream.getCiphertextLength(profilePicture.size.toLong())
+            val outputStream =
+                ProfileCipherOutputStream.getCiphertextLength(profilePicture.size.toLong())
             val profileKey = ProfileKeyUtil.getProfileKeyFromEncodedString(encodedProfileKey)
             val pad = ProfileAvatarData(
                 inputStream,
@@ -55,4 +60,48 @@ object ProfilePictureUtilities {
         }
         return deferred.promise
     }
+
+    fun uploadStatusImage(
+        statusImage: ByteArray,
+        encodeStatusKey: String,
+    ): Promise<StatusData, Exception> {
+        val deferred = deferred<StatusData, Exception>()
+        ThreadUtils.queue {
+            val inputStream = ByteArrayInputStream(statusImage)
+            val outputStream =
+                ProfileCipherOutputStream.getCiphertextLength(statusImage.size.toLong())
+            val statusKey = ProfileKeyUtil.getProfileKeyFromEncodedString(encodeStatusKey)
+            val pad = ProfileAvatarData(
+                inputStream,
+                outputStream,
+                "image/jpeg",
+                ProfileCipherOutputStreamFactory(
+                    statusKey
+                )
+            )
+            val drb = DigestingRequestBody(
+                pad.data,
+                pad.outputStreamFactory,
+                pad.contentType,
+                pad.dataLength,
+                null
+            )
+            val b = Buffer()
+            drb.writeTo(b)
+            val data = b.readByteArray()
+            var id: Long = 0
+            try {
+                id = retryIfNeeded(4) {
+                    FileServerAPIV2.upload(data)
+                }.get()
+            } catch (e: Exception) {
+                deferred.reject(e)
+            }
+            val url = "${FileServerAPIV2.server}/files/$id"
+            deferred.resolve(StatusData(url, statusKey))
+        }
+        return deferred.promise
+    }
 }
+
+data class StatusData(val url: String, val statusKey: ByteArray)

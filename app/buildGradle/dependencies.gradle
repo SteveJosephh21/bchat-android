@@ -148,6 +148,7 @@ dependencies {
     androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
     debugImplementation 'androidx.compose.ui:ui-test-manifest'
     implementation 'androidx.compose.material:material-icons-extended'
+    implementation 'androidx.compose.runtime:runtime-livedata:1.8.1'
     implementation("androidx.navigation:navigation-compose:$composeNavVersion")
     implementation("androidx.hilt:hilt-navigation-compose:$hiltNavigationCompose")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:$composeLifecyleRuntime")

@@ -30,6 +30,7 @@ import android.text.Spanned
 import android.text.TextUtils
 import android.text.TextWatcher
 import android.text.style.ForegroundColorSpan
+import android.util.Base64
 import android.util.Log
 import android.util.Pair
 import android.util.TypedValue
@@ -170,6 +171,10 @@ import io.beldex.bchat.preferences.PrivacySettingsActivity
 import io.beldex.bchat.reactions.ReactionsDialogFragment
 import io.beldex.bchat.reactions.any.ReactWithAnyEmojiDialogFragment
 import io.beldex.bchat.service.WebRtcCallService
+import io.beldex.bchat.status.ShowStatus
+import io.beldex.bchat.status.ShowStatusActivity
+import io.beldex.bchat.status.Status2
+import io.beldex.bchat.status.Status2Activity
 import io.beldex.bchat.util.ActivityDispatcher
 import io.beldex.bchat.util.BChatThreadPoolExecutor
 import io.beldex.bchat.util.ConfigurationMessageUtilities
@@ -478,6 +483,8 @@ class ConversationFragmentV2 : Fragment(), InputBarDelegate,
         const val PICK_GIF = 10
         const val PICK_FROM_LIBRARY = 12
         const val INVITE_CONTACTS = 124
+        const val STATUS_URL = "status_url"
+        const val STATUS_KEY = "status_key"
 
     }
 
@@ -756,6 +763,11 @@ class ConversationFragmentV2 : Fragment(), InputBarDelegate,
             }
         }
         callViewModel = ViewModelProvider(requireActivity())[CallViewModel::class.java]
+        if (!requireArguments().getString(STATUS_URL).isNullOrEmpty()) {
+            val statusUrl = requireArguments().getString(STATUS_URL) ?: ""
+            val statusKey = requireArguments().getString(STATUS_KEY) ?: ""
+            binding.inputBar.text = "$statusUrl$$statusKey"
+        }
     }
 
     override fun onResume() {
@@ -959,18 +971,35 @@ class ConversationFragmentV2 : Fragment(), InputBarDelegate,
         view: VisibleMessageView,
         event: MotionEvent
     ) {
+        Log.d("Status2Activity","handlePress")
         val actionMode = this.actionMode
         selectedEvent = event
         selectedView = view
         selectedMessageRecord = message
         if (actionMode != null) {
+            Log.d("Status2Activity","true")
             onDeselect(message, position, actionMode)
         } else {
-            // NOTE:
-            // We have to use onContentClick (rather than a click listener directly on
-            // the view) so as to not interfere with all the other gestures. Do not add
-            // onClickListeners directly to message content views.
-            view.onContentClick(event)
+            Log.d("Status2Activity","false")
+            val hasText = message.body.isNotEmpty() && !message.isDeleted
+            if(hasText && message.body.contains("$")) {
+                val parts = message.body.split("$")
+                val statusUrl = parts[0].trim()
+                val statusKeyString = parts[1].trim()
+                val statusKey = Base64.decode(statusKeyString, Base64.DEFAULT)
+                val intent = Intent(requireActivity(), ShowStatusActivity::class.java).apply {
+                    putExtra(ShowStatusActivity.EXTRA_DESTINATION, ShowStatus.ShowStatus.destination)
+                    putExtra(ConversationFragmentV2.STATUS_URL, statusUrl)
+                    putExtra(ConversationFragmentV2.STATUS_KEY, statusKey)
+                }
+                this.activity?.startActivity(intent)
+            } else {
+                // NOTE:
+                // We have to use onContentClick (rather than a click listener directly on
+                // the view) so as to not interfere with all the other gestures. Do not add
+                // onClickListeners directly to message content views.
+                view.onContentClick(event)
+            }
         }
     }
 

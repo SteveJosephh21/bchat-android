@@ -132,7 +132,12 @@ class VisibleMessage : Message()  {
         }
         // Attachments
         val database = MessagingModuleConfiguration.shared.messageDataProvider
-        val attachments = attachmentIDs.mapNotNull { database.getSignalAttachmentPointer(it) }
+        val attachments = attachmentIDs.mapNotNull {
+            Log.d("Status-Message success attachments-> ","$it")
+            database.getSignalAttachmentPointer(it)
+        }
+        Log.d("Status-Message success attachment-> ","${attachments.size}")
+        Log.d("Status-Message success attachment 1-> ","${attachments.any { it.url.isNullOrEmpty() }}")
         if (attachments.any { it.url.isNullOrEmpty() }) {
             if (BuildConfig.DEBUG) {
                 Log.w(TAG, "Sending a message before all associated attachments have been uploaded.")

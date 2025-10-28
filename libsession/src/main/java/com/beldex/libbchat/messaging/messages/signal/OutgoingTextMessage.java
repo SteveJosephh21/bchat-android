@@ -28,6 +28,10 @@ public class OutgoingTextMessage {
     return new OutgoingTextMessage(recipient, message.getText(), recipient.getExpireMessages() * 1000, -1, message.getSentTimestamp());
   }
 
+  public static OutgoingTextMessage fromStatus(VisibleMessage message, Recipient recipient) {
+    return new OutgoingTextMessage(recipient, message.getText(), 86400 * 1000, -1, message.getSentTimestamp());
+  }
+
   public static OutgoingTextMessage fromOpenGroupInvitation(OpenGroupInvitation openGroupInvitation, Recipient recipient, Long sentTimestamp) {
     String url = openGroupInvitation.getUrl();
     String name = openGroupInvitation.getName();

@@ -26,6 +26,7 @@ import io.beldex.bchat.conversation.v2.messages.VisibleMessageContentView
 import io.beldex.bchat.databinding.AlbumThumbnailViewBinding
 import io.beldex.bchat.util.DateUtils
 import java.util.Locale
+import com.beldex.libsignal.utilities.*
 
 class AlbumThumbnailView : RelativeLayout {
 
@@ -110,8 +111,10 @@ class AlbumThumbnailView : RelativeLayout {
             }
             this.slideSize = slides.size
         }
+        Log.d("Status-Message slide -> ", "${slides.size}, ${this.slideSize}")
         // iterate binding
         slides.take(MAX_ALBUM_DISPLAY_SIZE).forEachIndexed { position, slide ->
+            Log.d("Status-Message slide position -> ", "${position}, ${slide.isInProgress}")
             val thumbnailView = getThumbnailView(position)
             thumbnailView.setImageResource(glideRequests, slide, isPreview = false, mms = message)
         }

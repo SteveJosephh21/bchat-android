@@ -12,6 +12,7 @@ import com.beldex.libbchat.messaging.messages.Message
 import com.beldex.libbchat.messaging.messages.control.*
 import com.beldex.libbchat.messaging.messages.visible.*
 import com.beldex.libbchat.messaging.open_groups.*
+import com.beldex.libbchat.messaging.sending_receiving.attachments.Attachment
 import com.beldex.libbchat.messaging.utilities.MessageWrapper
 import com.beldex.libbchat.mnode.RawResponsePromise
 import com.beldex.libbchat.mnode.MnodeAPI
@@ -32,6 +33,7 @@ import com.beldex.libbchat.messaging.sending_receiving.attachments.Attachment as
 import com.beldex.libbchat.messaging.sending_receiving.link_preview.LinkPreview as SignalLinkPreview
 import com.beldex.libbchat.messaging.sending_receiving.quotes.QuoteModel as SignalQuote
 import com.beldex.libbchat.utilities.Device
+import com.beldex.libbchat.utilities.recipients.Recipient
 
 object MessageSender {
 
@@ -121,7 +123,15 @@ object MessageSender {
             val ciphertext: ByteArray
             val senderBeldexAddress = storage.getSenderBeldexAddress()!!
             when (destination) {
-                is Destination.Contact -> ciphertext = MessageEncrypter.encrypt(plaintext, destination.publicKey,senderBeldexAddress)
+                is Destination.Contact -> {
+                    Log.d("Status-Message recipient address -> ", destination.publicKey)
+                    Log.d("Status-Message recipient -> ","${message.recipient}")
+                    Log.d("Status-Message sender beldex address -> ", senderBeldexAddress)
+                    Log.d("Status-Message id -> ","${message.id}")
+                    Log.d("Status-Message isValid -> ","${message.isValid()}")
+                    Log.d("Status-Message -> ", "______________________________________________________________________")
+                    ciphertext = MessageEncrypter.encrypt(plaintext, destination.publicKey,senderBeldexAddress)
+                }
                 is Destination.ClosedGroup -> {
                     val encryptionKeyPair = MessagingModuleConfiguration.shared.storage.getLatestClosedGroupEncryptionKeyPair(destination.groupPublicKey)!!
                     ciphertext = MessageEncrypter.encrypt(
@@ -185,7 +195,6 @@ object MessageSender {
                         message.serverHash = hash
                         handleSuccessfulMessageSend(message, destination, isSyncMessage)
                         var shouldNotify = ((message is VisibleMessage || message is UnsendRequest || message is CallMessage) && !isSyncMessage)
-
                         if (message is ClosedGroupControlMessage && message.kind is ClosedGroupControlMessage.Kind.New) {
                             shouldNotify = true
                         }
@@ -330,6 +339,7 @@ object MessageSender {
         val messageDataProvider = MessagingModuleConfiguration.shared.messageDataProvider
         val attachmentIDs = messageDataProvider.getAttachmentIDsFor(message.id!!)
         message.attachmentIDs.addAll(attachmentIDs)
+        Log.d("Status-Message attachmentIDs single -> ","${message.attachmentIDs.size}")
         message.quote = Quote.from(quote)
         message.linkPreview = LinkPreview.from(linkPreview)
         message.linkPreview?.let { linkPreview ->
@@ -358,6 +368,34 @@ object MessageSender {
         return sendNonDurably(message, address)
     }
 
+    @JvmStatic
+    fun sendAttachments(message: Message, address: Address) {
+        val threadID = MessagingModuleConfiguration.shared.storage.getOrCreateThreadIdFor(address)
+        message.threadID = threadID
+        val destination = Destination.from(address)
+        val job = MessageSendJob(message, destination)
+        JobQueue.shared.add(job)
+    }
+
+    fun sendStatusAttachmentNonDurably(message: VisibleMessage, attachments: List<SignalAttachment>, address: Address)/*: Promise<Unit, Exception>*/ {
+        val messageDataProvider = MessagingModuleConfiguration.shared.messageDataProvider
+        val attachmentIDs = messageDataProvider.getAttachmentIDsFor(message.id!!)
+        message.attachmentIDs.addAll(attachmentIDs)
+        Log.d("Status-Message attachmentIDs media -> ","${message.attachmentIDs.size}")
+        message.quote = Quote.from(null)
+        message.linkPreview = LinkPreview.from(null)
+        message.linkPreview?.let { linkPreview ->
+            if (linkPreview.attachmentID == null) {
+                messageDataProvider.getLinkPreviewAttachmentIDFor(message.id!!)?.let { attachmentID ->
+                    linkPreview.attachmentID = attachmentID
+                    message.attachmentIDs.remove(attachmentID)
+                }
+            }
+        }
+        //return sendStatusNonDurably(message, address)
+        sendAttachments(message, address)
+    }
+
     fun sendNonDurably(message: Message, address: Address): Promise<Unit, Exception> {
         val threadID = MessagingModuleConfiguration.shared.storage.getOrCreateThreadIdFor(address)
         message.threadID = threadID
@@ -365,9 +403,32 @@ object MessageSender {
         return send(message, destination)
     }
 
+    fun sendStatusNonDurably(message: Message, address: Address): Promise<Unit, Exception> {
+        val destination = Destination.from(address)
+        return send(message, destination)
+    }
+
     // Secret groups
     fun createClosedGroup(device: Device, name: String, members: Collection<String>): Promise<String, Exception> {
         return create(device, name, members)
+    }
+
+    fun createStatusText(
+        device: Device,
+        status: String,
+        userPublicKey: String,
+        members: Collection<Recipient>
+    ): Promise<String, Exception> {
+        return createStatusTextOnlyMessage(device, status, userPublicKey, members)
+    }
+
+    fun createStatusAttachment(
+        attachments: List<Attachment>,
+        status: String?,
+        userPublicKey: String,
+        members: Collection<Recipient>
+    ): Promise<String, Exception> {
+        return createStatusAttachmentMessage(attachments, status, userPublicKey, members)
     }
 
     fun explicitNameChange(groupPublicKey: String, newName: String) {

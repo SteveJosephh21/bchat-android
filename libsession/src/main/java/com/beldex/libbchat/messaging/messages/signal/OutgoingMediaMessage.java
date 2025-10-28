@@ -1,5 +1,7 @@
 package com.beldex.libbchat.messaging.messages.signal;
 
+import android.util.Log;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -80,6 +82,11 @@ public class OutgoingMediaMessage {
                                           @Nullable QuoteModel outgoingQuote,
                                           @Nullable LinkPreview linkPreview)
   {
+    if(outgoingQuote != null) {
+      Log.d("Status-Message -> ", outgoingQuote.toString());
+    } else {
+      Log.d("Status-Message -> ", "empty");
+    }
     List<LinkPreview> previews = Collections.emptyList();
     if (linkPreview != null) {
       previews = Collections.singletonList(linkPreview);
@@ -87,6 +94,16 @@ public class OutgoingMediaMessage {
     return new OutgoingMediaMessage(recipient, message.getText(), attachments, message.getSentTimestamp(), -1,
             recipient.getExpireMessages() * 1000, DistributionTypes.DEFAULT, outgoingQuote, Collections.emptyList(),
             previews, Collections.emptyList(), Collections.emptyList());
+  }
+
+  public static OutgoingMediaMessage fromStatus(VisibleMessage message,
+                                          Recipient recipient,
+                                          List<Attachment> attachments,
+                                          @Nullable QuoteModel outgoingQuote)
+  {
+    return new OutgoingMediaMessage(recipient, message.getText(), attachments, message.getSentTimestamp(), -1,
+            recipient.getExpireMessages() * 1000, DistributionTypes.DEFAULT, outgoingQuote, Collections.emptyList(),
+            Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
   }
 
   public Recipient getRecipient() {
