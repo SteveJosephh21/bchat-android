@@ -83,6 +83,7 @@ import io.beldex.bchat.conversation.v2.contact_sharing.ContactModel
 import io.beldex.bchat.conversation.v2.contact_sharing.SharedContactView
 import io.beldex.bchat.conversation.v2.search.SearchViewModel
 import io.beldex.bchat.databinding.ViewVisibleMessageContentBinding
+import io.beldex.bchat.textformatter.TextFormatter
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -536,7 +537,7 @@ class VisibleMessageContentView : MaterialCardView {
             binding.bodyTextView.setTextColor(color)
             binding.bodyTextView.setLinkTextColor(color)
             val body = getBodySpans(context, message, searchQuery)
-            binding.bodyTextView.text = body
+            binding.bodyTextView.setText(body, TextView.BufferType.SPANNABLE)
             //New Line
             if (binding.bodyTextView.text.trim().length > 705) {
                 addReadMore(binding.bodyTextView.text.trim().toString(), binding.bodyTextView, message, delegate, visibleMessageView, position)
@@ -805,38 +806,38 @@ class VisibleMessageContentView : MaterialCardView {
             message: MessageRecord,
             searchQuery: String?
         ): Spannable {
-            var body = message.body.toSpannable()
+            var formatted = TextFormatter.formatForSentMessage(message.body).toSpannable()
 
             var linkLastClickTime: Long = 0
 
-            body = MentionUtilities.highlightMentions(
-                body,
+            formatted = MentionUtilities.highlightMentions(
+                formatted,
                 message.isOutgoing,
                 message.threadId,
                 context
             )
-            body = SearchUtil.getHighlightedSpan(Locale.getDefault(),
-                { BackgroundColorSpan(if(message.isOutgoing) context.getColor(R.color.black) else context.getColor(R.color.incoming_message_search_query)) }, body, searchQuery
+            formatted = SearchUtil.getHighlightedSpan(Locale.getDefault(),
+                { BackgroundColorSpan(if(message.isOutgoing) context.getColor(R.color.black) else context.getColor(R.color.incoming_message_search_query)) }, formatted, searchQuery
             )
-            body = SearchUtil.getHighlightedSpan(Locale.getDefault(),
-                { ForegroundColorSpan(if(message.isOutgoing) context.getColor(R.color.white) else context.getColor(R.color.received_message_text_color)) }, body, searchQuery
+            formatted = SearchUtil.getHighlightedSpan(Locale.getDefault(),
+                { ForegroundColorSpan(if(message.isOutgoing) context.getColor(R.color.white) else context.getColor(R.color.received_message_text_color)) }, formatted, searchQuery
             )
 
-            Linkify.addLinks(body, Linkify.WEB_URLS)
+            Linkify.addLinks(formatted, Linkify.WEB_URLS)
 
             // replace URLSpans with ModalURLSpans
-            body.getSpans<URLSpan>(0, body.length).toList().forEach { urlSpan ->
+            formatted.getSpans<URLSpan>(0, formatted.length).toList().forEach { urlSpan ->
                 val updatedUrl = urlSpan.url.let { it.toHttpUrlOrNull().toString() }
                 val replacementSpan = ModalURLSpan(updatedUrl) { url ->
                     ActivityDispatcher.get(context)?.showBottomSheetDialog(ModalUrlBottomSheet(url),"Open URL Dialog")
                 }
-                val start = body.getSpanStart(urlSpan)
-                val end = body.getSpanEnd(urlSpan)
-                val flags = body.getSpanFlags(urlSpan)
-                body.removeSpan(urlSpan)
-                body.setSpan(replacementSpan, start, end, flags)
+                val start = formatted.getSpanStart(urlSpan)
+                val end = formatted.getSpanEnd(urlSpan)
+                val flags = formatted.getSpanFlags(urlSpan)
+                formatted.removeSpan(urlSpan)
+                formatted.setSpan(replacementSpan, start, end, flags)
             }
-            return body
+            return formatted
         }
 
         @ColorInt

@@ -86,7 +86,6 @@ import com.beldex.libbchat.messaging.sending_receiving.MessageSender
 import com.beldex.libbchat.messaging.sending_receiving.attachments.Attachment
 import com.beldex.libbchat.messaging.sending_receiving.link_preview.LinkPreview
 import com.beldex.libbchat.messaging.sending_receiving.quotes.QuoteModel
-import com.beldex.libbchat.messaging.utilities.UpdateMessageData.Companion.buildSharedContact
 import com.beldex.libbchat.mnode.MnodeAPI
 import com.beldex.libbchat.utilities.Address
 import com.beldex.libbchat.utilities.MediaTypes
@@ -113,7 +112,6 @@ import io.beldex.bchat.contactshare.SimpleTextWatcher
 import io.beldex.bchat.conversation.v2.contact_sharing.ContactModel
 import io.beldex.bchat.conversation.v2.contact_sharing.ContactSharingActivity
 import io.beldex.bchat.conversation.v2.contact_sharing.ViewAllContactFragment
-import io.beldex.bchat.conversation.v2.contact_sharing.capitalizeFirstLetter
 import io.beldex.bchat.conversation.v2.contact_sharing.flattenData
 import io.beldex.bchat.conversation.v2.dialogs.LinkPreviewDialog
 import io.beldex.bchat.conversation.v2.dialogs.SendSeedDialog
@@ -184,6 +182,7 @@ import io.beldex.bchat.preferences.PrivacySettingsActivity
 import io.beldex.bchat.reactions.ReactionsDialogFragment
 import io.beldex.bchat.reactions.any.ReactWithAnyEmojiDialogFragment
 import io.beldex.bchat.service.WebRtcCallService
+import io.beldex.bchat.textformatter.TextFormatter
 import io.beldex.bchat.util.ActivityDispatcher
 import io.beldex.bchat.util.BChatThreadPoolExecutor
 import io.beldex.bchat.util.BaseFragment
@@ -1451,13 +1450,13 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
     }
 
     override fun inputBarEditTextContentChanged(newContent : CharSequence) {
+        //val inputBarFormattedText = TextFormatter.formatForSentMessage(newContent.toString())
         if (isShowingAttachmentOptions) {
             binding.attachmentContainer.visibility=View.GONE
             isShowingAttachmentOptions=!isShowingAttachmentOptions
         }
-        val inputBarText=binding.inputBar.text
         if (listenerCallback!!.gettextSecurePreferences().isLinkPreviewsEnabled()) {
-            linkPreviewViewModel.onTextChanged(requireActivity(), inputBarText, 0, 0)
+            linkPreviewViewModel.onTextChanged(requireActivity(), newContent.toString(), 0, 0)
         }
         val recipient=viewModel.recipient.value ?: return
         if (recipient.isGroupRecipient) {
@@ -1471,7 +1470,7 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
             LinkPreviewDialog {
                 setUpLinkPreviewObserver()
                 linkPreviewViewModel.onEnabled()
-                linkPreviewViewModel.onTextChanged(requireContext(), inputBarText, 0, 0)
+                linkPreviewViewModel.onTextChanged(requireContext(), newContent.toString(), 0, 0)
             }.show(requireActivity().supportFragmentManager, "Link Preview Dialog")
             listenerCallback!!.gettextSecurePreferences().setHasSeenLinkPreviewSuggestionDialog()
         }
@@ -3757,7 +3756,9 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
 
         // region General
         private fun getMessageBody() : String {
-            var result=binding.inputBar.text.trim()
+            Log.d("Spannable-String -> ", "${TextFormatter.formatForSentMessage(binding.inputBar.text.trim())}")
+            Log.d("Spannable-String trim -> ", binding.inputBar.text.trim())
+            var result = binding.inputBar.text.trim()
             for (mention in mentions) {
                 try {
                     val startIndex=result.indexOf("@" + mention.displayName)

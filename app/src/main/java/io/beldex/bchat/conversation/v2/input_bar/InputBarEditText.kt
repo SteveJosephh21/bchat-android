@@ -6,11 +6,11 @@ import android.net.Uri
 import android.util.AttributeSet
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
-import android.widget.RelativeLayout
 import androidx.appcompat.widget.AppCompatEditText
 import androidx.core.view.inputmethod.EditorInfoCompat
 import androidx.core.view.inputmethod.InputConnectionCompat
 import io.beldex.bchat.conversation.v2.utilities.TextUtilities
+import io.beldex.bchat.textformatter.TextFormatter
 import io.beldex.bchat.util.toPx
 import kotlin.math.max
 import kotlin.math.min
@@ -27,23 +27,144 @@ class InputBarEditText : AppCompatEditText {
 
     constructor(context: Context) : super(context)
     constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
-    constructor(context: Context, attrs: AttributeSet, defStyleAttr: Int) : super(context, attrs, defStyleAttr)
+    constructor(context: Context, attrs: AttributeSet, defStyleAttr: Int) : super(
+        context,
+        attrs,
+        defStyleAttr
+    )
+
+    private var isFormatting = false
+    private fun handleAutoNumbering(beforeText: String) {
+        val editable = text ?: return
+        var cursor = selectionStart
+        if (cursor == 0) return
+
+        // Find current line start
+        val lineStart = beforeText.lastIndexOf('\n') + 1
+        var currentLine = beforeText.substring(lineStart)
+        currentLine = currentLine.replace(Regex("[\\u200B-\\u200D\\uFEFF]"), "")
+
+        // Match numbered list "1. text"
+        val match = Regex("""^\s*(\d+)\.\s+""").find(currentLine)
+
+        if (match != null) {
+            val number = match.groupValues[1].toInt()
+            val nextNumber = number + 1
+
+            // --- FIX: remove newline inserted by keyboard ---
+            if (cursor > 0 && editable[cursor - 1] == '\n') {
+                editable.delete(cursor - 1, cursor)
+                cursor -= 1
+            }
+
+            // Insert newline + next number
+            val insertText = "\n$nextNumber. "
+            editable.insert(cursor, insertText)
+            setSelection(cursor + insertText.length)
+        } else {
+            // Normal enter
+            if (cursor > 0 && editable[cursor - 1] == '\n') return
+            editable.insert(cursor, "\n")
+            setSelection(cursor + 1)
+        }
+    }
 
     override fun onTextChanged(text: CharSequence, start: Int, lengthBefore: Int, lengthAfter: Int) {
         super.onTextChanged(text, start, lengthBefore, lengthAfter)
-        delegate?.inputBarEditTextContentChanged(text)
-        // Calculate the width manually to get it right even before layout has happened (i.e.
-        // when restoring a draft). The 64 DP is the horizontal margin around the input bar
-        // edit text.
-        val width = (screenWidth - 2 * toPx(64.0f, resources)).roundToInt()
-        if (width < 0) { return } // screenWidth initially evaluates to 0
-        val height = TextUtilities.getIntrinsicHeight(text, paint, width).toFloat()
-        val constrainedHeight = min(max(height, snMinHeight), snMaxHeight)
-        if (constrainedHeight.roundToInt() == this.height) { return }
-        val layoutParams = this.layoutParams as? RelativeLayout.LayoutParams ?: return
-        layoutParams.height = constrainedHeight.roundToInt()
-        this.layoutParams = layoutParams
-        delegate?.inputBarEditTextHeightChanged(constrainedHeight.roundToInt())
+
+        if (isFormatting) return
+
+        val editable = this.text ?: return
+        val cursorPos = selectionStart
+        val rawText = editable.toString()
+
+        // --- Auto-list logic (numbered or bullet) ---
+        if (lengthAfter == 1 && text.endsWith("\n")) {
+            isFormatting = true
+            val beforeText = rawText.substring(0, max(0, cursorPos - 1))
+            handleAutoList(beforeText)
+            isFormatting = false
+            return
+        }
+
+        // --- Apply formatting (bold/italic/spans) ---
+        val formatted = TextFormatter.formatAppText(rawText)
+        if (formatted.toString() != rawText) {
+            isFormatting = true
+            val oldCursor = selectionStart
+            val beforeCursorText = if (oldCursor in 1..rawText.length) rawText.substring(0, oldCursor) else rawText
+            val formattedBeforeCursor = TextFormatter.formatAppText(beforeCursorText)
+            val newCursor = formattedBeforeCursor.length
+
+            setText(formatted)
+            try { setSelection(min(newCursor, formatted.length)) } catch (e: Exception) { setSelection(formatted.length) }
+
+            isFormatting = false
+        }
+
+        // --- Notify delegate about text changes ---
+        delegate?.inputBarEditTextContentChanged(editable.toString())
+
+        // --- Update height dynamically ---
+        val width = (screenWidth - 2 * toPx(64f, resources)).roundToInt()
+        if (width > 0) {
+            val height = TextUtilities.getIntrinsicHeight(editable, paint, width).toFloat()
+            val constrainedHeight = min(max(height, snMinHeight), snMaxHeight)
+            if (constrainedHeight.roundToInt() != this.height) {
+                val layoutParams = this.layoutParams
+                if (layoutParams != null) {
+                    layoutParams.height = constrainedHeight.roundToInt()
+                    this.layoutParams = layoutParams
+                    delegate?.inputBarEditTextHeightChanged(constrainedHeight.roundToInt())
+                }
+            }
+        }
+    }
+
+    // -------------------------
+    // Auto-numbered and bullet list handling
+    // -------------------------
+    private fun handleAutoList(beforeText: String) {
+        val editable = text ?: return
+        var cursor = selectionStart
+        if (cursor == 0) return
+
+        val lineStart = beforeText.lastIndexOf('\n') + 1
+        var currentLine = beforeText.substring(lineStart)
+        currentLine = currentLine.replace(Regex("[\\u200B-\\u200D\\uFEFF]"), "")
+
+        val numberMatch = Regex("""^\s*(\d+)\.\s+""").find(currentLine)
+        val bulletMatch = Regex("""^\s*([-•])\s+""").find(currentLine)
+
+        if (numberMatch != null) {
+            val number = numberMatch.groupValues[1].toInt()
+            val nextNumber = number + 1
+
+            if (cursor > 0 && editable[cursor - 1] == '\n') {
+                editable.delete(cursor - 1, cursor)
+                cursor -= 1
+            }
+
+            val insertText = "\n$nextNumber. "
+            editable.insert(cursor, insertText)
+            setSelection(cursor + insertText.length)
+
+        } else if (bulletMatch != null) {
+            if (cursor > 0 && editable[cursor - 1] == '\n') {
+                editable.delete(cursor - 1, cursor)
+                cursor -= 1
+            }
+
+            val bulletChar = bulletMatch.groupValues[1]
+            val insertText = "\n$bulletChar "
+            editable.insert(cursor, insertText)
+            setSelection(cursor + insertText.length)
+
+        } else {
+            if (cursor > 0 && editable[cursor - 1] == '\n') return
+            editable.insert(cursor, "\n")
+            setSelection(cursor + 1)
+        }
     }
 
     /*Hales63*/

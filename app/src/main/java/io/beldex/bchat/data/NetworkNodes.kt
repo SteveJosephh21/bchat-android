@@ -19,7 +19,8 @@ object NetworkNodes  {
         "publicnode5.rpcnode.stream:29095"
     )
     private val testNetModes = listOf(
-        "149.102.156.174:19095"
+        "209.126.86.93:29091"
+        //"149.102.156.174:19095"
     )
 
     fun getNodes(mContext: Context): List<String> {

@@ -8,7 +8,6 @@ import android.util.TypedValue
 import android.view.View
 import android.widget.LinearLayout
 import androidx.annotation.ColorInt
-import androidx.compose.ui.res.colorResource
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.content.res.use
@@ -22,13 +21,13 @@ import com.bumptech.glide.RequestManager
 import com.google.android.material.card.MaterialCardView
 import dagger.hilt.android.AndroidEntryPoint
 import io.beldex.bchat.R
-import io.beldex.bchat.compose_utils.TextColor
 import io.beldex.bchat.conversation.v2.contact_sharing.capitalizeFirstLetter
 import io.beldex.bchat.conversation.v2.contact_sharing.flattenData
 import io.beldex.bchat.conversation.v2.utilities.MentionUtilities
 import io.beldex.bchat.database.BchatContactDatabase
 import io.beldex.bchat.databinding.ViewQuoteBinding
 import io.beldex.bchat.mms.SlideDeck
+import io.beldex.bchat.textformatter.TextFormatter
 import io.beldex.bchat.util.MediaUtil
 import io.beldex.bchat.util.UiModeUtilities
 import io.beldex.bchat.util.getScreenWidth
@@ -265,6 +264,7 @@ class QuoteView @JvmOverloads constructor(context: Context, attrs: AttributeSet?
                                     threadID,
                                     context
                                 )
+                                TextFormatter.formatForSentMessage(bodyText)
                             }
                         }
                     }else{
@@ -273,15 +273,17 @@ class QuoteView @JvmOverloads constructor(context: Context, attrs: AttributeSet?
                             threadID,
                             context
                         )
+                        TextFormatter.formatForSentMessage(bodyText)
                     }
                 }else{
                    bodyText = MentionUtilities.highlightMentions((body ?: "").toSpannable(), threadID, context)
+                    TextFormatter.formatForSentMessage(bodyText)
                 }
                 bodyText = when {
                     bodyText.length > 35 -> "${bodyText.subSequence(0, 35)}... "
                     else -> bodyText
                 }
-                bodyText
+                TextFormatter.formatForSentMessage(bodyText)
             }
         }
         //binding.quoteViewBodyTextView.setTextColor(getTextColor(isOutgoingMessage))

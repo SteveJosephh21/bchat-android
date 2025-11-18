@@ -65,7 +65,8 @@ object MnodeAPI {
         if (useTestnet) {
             Log.d("beldex","here testnet $useTestnet")
             //setOf("http://38.242.196.72:19095","http://154.26.139.105:19095")
-            setOf("http://149.102.156.174:19095")
+            //setOf("http://149.102.156.174:19095")
+            setOf("http://209.126.86.93:29091")
         } else {
             Log.d("beldex","here mainnet $useTestnet")
             setOf("https://publicnode1.rpcnode.stream:$nodePort","https://publicnode2.rpcnode.stream:$nodePort","https://publicnode3.rpcnode.stream:$nodePort","https://publicnode4.rpcnode.stream:$nodePort")//"https://mainnet.beldex.io:29095","https://explorer.beldex.io:19091","http://publicnode1.rpcnode.stream:29095","http://publicnode2.rpcnode.stream:29095","http://publicnode3.rpcnode.stream:29095","http://publicnode4.rpcnode.stream:29095"

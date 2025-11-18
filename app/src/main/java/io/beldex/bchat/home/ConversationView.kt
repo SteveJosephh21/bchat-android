@@ -3,14 +3,18 @@ package io.beldex.bchat.home
 import android.content.Context
 import android.content.res.Resources
 import android.graphics.Typeface
+import android.text.Spannable
+import android.text.SpannableStringBuilder
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
+import androidx.core.text.toSpannable
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.RecyclerView
@@ -21,11 +25,16 @@ import io.beldex.bchat.BuildConfig
 import io.beldex.bchat.R
 import io.beldex.bchat.conversation.v2.contact_sharing.capitalizeFirstLetter
 import io.beldex.bchat.conversation.v2.contact_sharing.flattenData
+import io.beldex.bchat.conversation.v2.messages.VisibleMessageContentView.Companion.getBodySpans
+import io.beldex.bchat.conversation.v2.utilities.MentionUtilities
 import io.beldex.bchat.conversation.v2.utilities.MentionUtilities.highlightMentions
+import io.beldex.bchat.conversation.v2.utilities.MentionUtilities.highlightMentionsSpannableString
 import io.beldex.bchat.database.RecipientDatabase.NOTIFY_TYPE_ALL
 import io.beldex.bchat.database.RecipientDatabase.NOTIFY_TYPE_NONE
 import io.beldex.bchat.database.model.ThreadRecord
 import io.beldex.bchat.databinding.ViewConversationBinding
+import io.beldex.bchat.textformatter.AppTextFormatter
+import io.beldex.bchat.textformatter.TextFormatter
 import io.beldex.bchat.util.DateUtils
 import io.beldex.bchat.util.isSharedContact
 import io.beldex.bchat.util.shortNameAndAddress
@@ -142,7 +151,8 @@ class ConversationView : LinearLayout {
             binding.snippetTextViewLayout.visibility = View.VISIBLE
 
             val rawSnippet = thread.getDisplayBody(context)
-            val snippet = highlightMentions(rawSnippet,thread.threadId, context)
+            val formatted = TextFormatter.formatForSentMessage(rawSnippet)
+            val snippet = highlightMentionsSpannableString(formatted,thread.threadId, context)
 
             //SteveJosephh21-17 - if
             /*val mmsSmsDatabase = get(context).mmsSmsDatabase()
