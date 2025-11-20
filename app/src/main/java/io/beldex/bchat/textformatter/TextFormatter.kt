@@ -1,13 +1,9 @@
 package io.beldex.bchat.textformatter
 
-import android.R.attr.text
-import android.graphics.Color
 import android.text.SpannableString
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.BackgroundColorSpan
-import android.text.style.LeadingMarginSpan
-import android.text.style.QuoteSpan
 import androidx.core.graphics.toColorInt
 
 
@@ -48,20 +44,31 @@ object TextFormatter {
             toUnicodeStrikethrough(match.groupValues[1])
         }
 
-        // 6. WhatsApp-style block quote (> line)
-        /*val spans = builder.getSpans(0, builder.length, CustomQuoteSpan::class.java)
-        if (spans.isNotEmpty()) {
-            builder.setSpan(
+        applyRegexSpan(builder, Regex("~(.*?)~")) { match ->
+            toUnicodeStrikethrough(match.groupValues[1])
+        }
+
+        applyRegexSpan(
+            builder,
+            Regex("(?m)^> ?(.*)$")
+        ) { match ->
+            val content = match.groupValues[1]   // "text"
+
+            // Build a new spannable for the replacement
+            val sb = SpannableStringBuilder(content)
+
+            sb.setSpan(
                 CustomQuoteSpan(
                     stripeColor = 0xFFCCCCCC.toInt(),
                     stripeWidth = 10,
                     gapWidth = 25
                 ),
                 0,
-                builder.length,
+                content.length,
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
             )
-        }*/
+            sb
+        }
 
         return builder
     }
@@ -77,43 +84,6 @@ object TextFormatter {
             builder.replace(match.range.first, match.range.last + 1, replacementText)
         }
     }
-
-    /*@JvmStatic
-    fun formatForSentMessage(rawText: String): CharSequence {
-        var result = rawText
-
-        // Bold
-        result = result.replace(Regex("\\*(.*?)\\*")) { matchResult ->
-            val inner = matchResult.groups[1]?.value ?: return@replace matchResult.value
-            toUnicodeBold(inner)
-        }
-
-        // Italic
-        result = result.replace(Regex("_(.*?)_")) { matchResult ->
-            val inner = matchResult.groups[1]?.value ?: return@replace matchResult.value
-            toUnicodeItalic(inner)
-        }
-
-        // Strikethrough
-        result = result.replace(Regex("~(.*?)~")) { matchResult ->
-            val inner = matchResult.groups[1]?.value ?: return@replace matchResult.value
-            toUnicodeStrikethrough(inner)
-        }
-
-        // MonoSpace
-        result = result.replace(Regex("(?s)```(.*?)```")) { matchResult ->
-            val inner = matchResult.groups[1]?.value ?: return@replace matchResult.value
-            toUnicodeMonospace(inner)
-        }
-
-        // Inline Code
-        result = result.replace(Regex("`(.*?)`")) { matchResult ->
-            val inner = matchResult.groups[1]?.value ?: return@replace matchResult.value
-            toUnicodeInlineCode(inner)
-        }
-
-        return result
-    }*/
 
     @JvmStatic
     fun toUnicodeBold(text: String?): CharSequence {

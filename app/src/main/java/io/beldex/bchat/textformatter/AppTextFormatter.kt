@@ -1,5 +1,4 @@
 package io.beldex.bchat.textformatter
-import android.graphics.Color
 import android.graphics.Typeface
 import android.text.Spannable
 import android.text.SpannableStringBuilder
@@ -8,7 +7,6 @@ import android.text.style.BackgroundColorSpan
 import android.text.style.StrikethroughSpan
 import android.text.style.StyleSpan
 import android.text.style.TypefaceSpan
-import java.util.regex.Pattern
 import androidx.core.graphics.toColorInt
 import android.text.style.LeadingMarginSpan
 
@@ -16,10 +14,10 @@ class AppTextFormatter(private val text: String) {
     private val pattern = Regex(
         "(?s)" +
                 "(```.+?```)|" +             // 1: code block
-                "(`[^`]+`)|" +               // 2: inline code
-                "\\*([^*]+)\\*|" +           // 3: bold
-                "_([^_]+)_|" +               // 4: italic
-                "~([^~]+)~|" +               // 5: strike
+                "\\*([^*]+)\\*|" +           // 2: bold
+                "_([^_]+)_|" +               // 3: italic
+                "~([^~]+)~|" +               // 4: strike
+                "(`[^`]+`)|" +               // 5: inline code
                 "(?:^|\\n)(> .+?)|" +         // 6: Block quote
                 "(?:^|\\n)\\s*(\\d+)\\.\\s+(.*)$"   // 7: Numbered list (1. text)
 
@@ -52,7 +50,7 @@ class AppTextFormatter(private val text: String) {
                     )
                 }
 
-                // 3: bold
+                // 2: bold
                 content.startsWith('*') -> {
                     val innerText = content.substring(1, content.length - 1)
                     val boldText = TextFormatter.toUnicodeBold(innerText)
@@ -68,7 +66,7 @@ class AppTextFormatter(private val text: String) {
                     )
                 }
 
-                // 4: italic
+                // 3: italic
                 content.startsWith('_') -> {
                     val innerText = content.substring(1, content.length - 1)
                     val italicText = TextFormatter.toUnicodeItalic(innerText)
@@ -83,7 +81,7 @@ class AppTextFormatter(private val text: String) {
                     )
                 }
 
-                // 5: strike
+                // 4: strike
                 content.startsWith('~') -> {
                     val innerText = content.substring(1, content.length - 1)
                     val strikeText = TextFormatter.toUnicodeStrikethrough(innerText)
@@ -98,23 +96,23 @@ class AppTextFormatter(private val text: String) {
                     )
                 }
 
-                // 2: inline code
+                // 5: inline code
                 content.startsWith('`') -> {
 
                     val innerText = content.substring(1, content.length - 1)
                     val mono = TextFormatter.toUnicodeInlineCode(innerText)
 
-                    val start1 = out.length   // <--- REAL start before adding anything
+                    val startingLength = out.length   // <--- REAL start before adding anything
 
                     if (showMarkup) out.append("`")
                     out.append(mono)
                     if (showMarkup) out.append("`")
 
-                    val end = out.length     // <--- REAL end after adding everything
+                    val endingLength = out.length     // <--- REAL end after adding everything
 
                     // Correct monospace span
-                    val spanStart = start1 + if (showMarkup) 1 else 0
-                    val spanEnd = end - if (showMarkup) 1 else 0
+                    val spanStart = startingLength + if (showMarkup) 1 else 0
+                    val spanEnd = endingLength - if (showMarkup) 1 else 0
 
                     out.setSpan(
                         TypefaceSpan("monospace"),
@@ -141,9 +139,9 @@ class AppTextFormatter(private val text: String) {
                         if (trimmed.startsWith("> ") && trimmed.length > 2) {
                             val cleanText = trimmed.substring(2)
 
-                            val startQ = out.length
+                            val startingLength = out.length
                             out.append(cleanText)
-                            val endQ = out.length
+                            val endingLength = out.length
 
                             out.setSpan(
                                 CustomQuoteSpan(
@@ -151,8 +149,8 @@ class AppTextFormatter(private val text: String) {
                                     stripeWidth = 10,
                                     gapWidth = 25
                                 ),
-                                startQ,
-                                endQ,
+                                startingLength,
+                                endingLength,
                                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
                             )
                         } else {
@@ -195,34 +193,6 @@ class AppTextFormatter(private val text: String) {
         if (last < text.length) {
             out.append(text.substring(last))
         }
-    }
-
-    fun renderToUnicode(): String {
-        val sb = StringBuilder()
-        var last = 0
-        pattern.findAll(text).forEach { match ->
-            if (match.range.first > last) {
-                sb.append(text.substring(last, match.range.first))
-            }
-
-            val content = match.value
-            val innerText = content.substring(
-                if (content.startsWith("```")) 3 else 1,
-                content.length - if (content.startsWith("```")) 3 else 1
-            )
-            val inner = AppTextFormatter(innerText).renderToUnicode()
-            when {
-                content.startsWith("```") -> sb.append(TextFormatter.toUnicodeMonospace(inner)) // code block
-                content.startsWith('`') -> sb.append(TextFormatter.toUnicodeInlineCode(inner))  // inline code
-                content.startsWith('*') -> sb.append(TextFormatter.toUnicodeBold(inner))
-                content.startsWith('_') -> sb.append(TextFormatter.toUnicodeItalic(inner))
-                content.startsWith('~') -> sb.append(TextFormatter.toUnicodeStrikethrough(inner))
-            }
-
-            last = match.range.last + 1
-        }
-        if (last < text.length) sb.append(text.substring(last))
-        return sb.toString()
     }
 }
 

@@ -9,6 +9,7 @@ import android.graphics.drawable.Drawable
 import android.os.SystemClock
 import android.text.Spannable
 import android.text.SpannableString
+import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.TextPaint
 import android.text.method.LinkMovementMethod
@@ -28,7 +29,6 @@ import android.widget.Toast
 import androidx.annotation.ColorInt
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -47,7 +47,6 @@ import androidx.core.content.res.ResourcesCompat
 import androidx.core.graphics.BlendModeColorFilterCompat
 import androidx.core.graphics.BlendModeCompat
 import androidx.core.text.getSpans
-import androidx.core.text.toSpannable
 import androidx.core.view.isVisible
 import com.beldex.libbchat.messaging.MessagingModuleConfiguration
 import com.beldex.libbchat.messaging.sending_receiving.attachments.AttachmentTransferProgress
@@ -805,8 +804,8 @@ class VisibleMessageContentView : MaterialCardView {
             context: Context,
             message: MessageRecord,
             searchQuery: String?
-        ): Spannable {
-            var formatted = TextFormatter.formatForSentMessage(message.body).toSpannable()
+        ): SpannableStringBuilder {
+            var formatted = TextFormatter.formatForSentMessage(message.body)
 
             var linkLastClickTime: Long = 0
 
@@ -816,10 +815,10 @@ class VisibleMessageContentView : MaterialCardView {
                 message.threadId,
                 context
             )
-            formatted = SearchUtil.getHighlightedSpan(Locale.getDefault(),
+            formatted = SearchUtil.getHighlightedSpanBuilder(Locale.getDefault(),
                 { BackgroundColorSpan(if(message.isOutgoing) context.getColor(R.color.black) else context.getColor(R.color.incoming_message_search_query)) }, formatted, searchQuery
             )
-            formatted = SearchUtil.getHighlightedSpan(Locale.getDefault(),
+            formatted = SearchUtil.getHighlightedSpanBuilder(Locale.getDefault(),
                 { ForegroundColorSpan(if(message.isOutgoing) context.getColor(R.color.white) else context.getColor(R.color.received_message_text_color)) }, formatted, searchQuery
             )
 
