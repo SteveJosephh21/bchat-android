@@ -181,7 +181,7 @@ class AppTextFormatter(private val text: String) {
                     // -------------------------------------------------
                     // 5: QUOTES (> text)
                     // -------------------------------------------------
-                    match.groups[6] != null -> {
+                    match.groups[5] != null -> {
                         val lines = content.split("\n")
                         for (line in lines) {
                             val trimmed = line.trimStart()
