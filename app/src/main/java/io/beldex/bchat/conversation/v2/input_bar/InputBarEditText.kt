@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.res.Resources
 import android.net.Uri
 import android.util.AttributeSet
+import android.util.Log
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import androidx.appcompat.widget.AppCompatEditText
@@ -34,40 +35,6 @@ class InputBarEditText : AppCompatEditText {
     )
 
     private var isFormatting = false
-    private fun handleAutoNumbering(beforeText: String) {
-        val editable = text ?: return
-        var cursor = selectionStart
-        if (cursor == 0) return
-
-        // Find current line start
-        val lineStart = beforeText.lastIndexOf('\n') + 1
-        var currentLine = beforeText.substring(lineStart)
-        currentLine = currentLine.replace(Regex("[\\u200B-\\u200D\\uFEFF]"), "")
-
-        // Match numbered list "1. text"
-        val match = Regex("""^\s*(\d+)\.\s+""").find(currentLine)
-
-        if (match != null) {
-            val number = match.groupValues[1].toInt()
-            val nextNumber = number + 1
-
-            // --- FIX: remove newline inserted by keyboard ---
-            if (cursor > 0 && editable[cursor - 1] == '\n') {
-                editable.delete(cursor - 1, cursor)
-                cursor -= 1
-            }
-
-            // Insert newline + next number
-            val insertText = "\n$nextNumber. "
-            editable.insert(cursor, insertText)
-            setSelection(cursor + insertText.length)
-        } else {
-            // Normal enter
-            if (cursor > 0 && editable[cursor - 1] == '\n') return
-            editable.insert(cursor, "\n")
-            setSelection(cursor + 1)
-        }
-    }
 
     override fun onTextChanged(text: CharSequence, start: Int, lengthBefore: Int, lengthAfter: Int) {
         super.onTextChanged(text, start, lengthBefore, lengthAfter)
@@ -78,7 +45,25 @@ class InputBarEditText : AppCompatEditText {
         val cursorPos = selectionStart
         val rawText = editable.toString()
 
-        // --- Auto-list logic (numbered or bullet) ---
+        // --- Convert "* " or "- " into bullet "• " ---
+        if (lengthAfter == 1 && text.endsWith(" ")) {
+            if (cursorPos >= 2) {
+                val twoChars = rawText.substring(cursorPos - 2, cursorPos)
+                if (twoChars == "* " || twoChars == "- ") {
+                    isFormatting = true
+                    // Remove typed symbols
+                    editable.delete(cursorPos - 2, cursorPos)
+                    // Insert bullet
+                    editable.insert(cursorPos - 2, "• ")
+                    // Move cursor after bullet
+                    setSelection(cursorPos - 2 + 2)
+                    isFormatting = false
+                    return
+                }
+            }
+        }
+
+        // --- Auto-list logic on Enter ---
         if (lengthAfter == 1 && text.endsWith("\n")) {
             isFormatting = true
             val beforeText = rawText.substring(0, max(0, cursorPos - 1))
