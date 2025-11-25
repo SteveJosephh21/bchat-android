@@ -58,7 +58,8 @@
                     android:fontFamily="@font/open_sans_medium"
                     android:hint="@string/ConversationActivity_message"
                     android:textColor="@color/text"
-                    android:textSize="@dimen/small_font_size" />
+                    android:textSize="@dimen/small_font_size"
+                    android:inputType="textNoSuggestions"/>
 
                 <RelativeLayout
                     android:id="@+id/payAsYouChatLayout"
