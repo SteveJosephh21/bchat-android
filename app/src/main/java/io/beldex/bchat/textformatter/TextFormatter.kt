@@ -12,7 +12,7 @@ object TextFormatter {
     fun formatAppText(input: CharSequence): SpannableStringBuilder {
         val out = SpannableStringBuilder()
         val parser = AppTextFormatter(input.toString())
-        parser.appendFormatted(out, showMarkup = true)
+        parser.appendFormatted(out)
         return out
     }
 

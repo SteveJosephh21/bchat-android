@@ -1,4 +1,6 @@
 package io.beldex.bchat.textformatter
+import android.annotation.SuppressLint
+import android.graphics.Color
 import android.graphics.Typeface
 import android.text.Spannable
 import android.text.SpannableStringBuilder
@@ -8,187 +10,198 @@ import android.text.style.StrikethroughSpan
 import android.text.style.StyleSpan
 import android.text.style.TypefaceSpan
 import androidx.core.graphics.toColorInt
-import android.text.style.LeadingMarginSpan
 
 class AppTextFormatter(private val text: String) {
+    private val codeBlockPattern = Regex(
+        "(?s)" +
+                "(```.+?```)$"               // code block
+    )
     private val pattern = Regex(
         "(?s)" +
-                "(```.+?```)|" +             // 1: code block
-                "\\*([^*]+)\\*|" +           // 2: bold
-                "_([^_]+)_|" +               // 3: italic
-                "~([^~]+)~|" +               // 4: strike
-                "(`[^`]+`)|" +               // 5: inline code
-                "(?:^|\\n)(> .+?)|" +         // 6: Block quote
-                "(?:^|\\n)\\s*(\\d+)\\.\\s+(.*)$"   // 7: Numbered list (1. text)
-
+                "\\*([^*]+)\\*|" +           // 1: bold
+                "_([^_]+)_|" +               // 2: italic
+                "~([^~]+)~|" +               // 3: strike
+                "(`[^`]+`)|" +               // 4: inline code
+                "(?:^|\\n)(> .+?)$"          // 5: Block quote
     )
 
-    fun appendFormatted(out: SpannableStringBuilder, showMarkup: Boolean) {
+    @SuppressLint("UseKtx")
+    private val foregroundColorSpan = "#66FFFFFF".toColorInt()
+    private val backgroundColorSpan = "#797984".toColorInt()
+
+    fun appendFormatted(out: SpannableStringBuilder) {
         var last = 0
-        pattern.findAll(text).forEach { match ->
-            if (match.range.first > last) {
-                out.append(text.substring(last, match.range.first))
-            }
+        if(text.startsWith("```")){
+            for (match in codeBlockPattern.findAll(text)) {
+                if (match.range.first > last) {
+                    out.append(text.substring(last, match.range.first))
+                }
 
-            val content = match.value
-
-            val start = out.length
-            when {
-                // 1: code block
-                content.startsWith("```") -> {
-                    // Triple backtick code block
+                val content = match.value
+                // -------------------------------------------------
+                // CODE BLOCK (``` ``` )
+                // -------------------------------------------------
+                if (content.startsWith("```")) {
                     val innerText = content.substring(3, content.length - 3)
-                    val mono = TextFormatter.toUnicodeMonospace(innerText)
-                    if (showMarkup) out.append("```")
-                    out.append(mono)
-                    if (showMarkup) out.append("```")
+                    val monoUnicode = TextFormatter.toUnicodeMonospace(innerText)
+
+                    val openStart = out.length
+                    out.append("```")
                     out.setSpan(
-                        TypefaceSpan("monospace"),
-                        start + if (showMarkup) 3 else 0,
-                        out.length - if (showMarkup) 3 else 0,
+                        ForegroundColorSpan(foregroundColorSpan),
+                        openStart,
+                        openStart + 3,
                         Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
                     )
-                }
 
-                // 2: bold
-                content.startsWith('*') -> {
-                    val innerText = content.substring(1, content.length - 1)
-                    val boldText = TextFormatter.toUnicodeBold(innerText)
-                    if (showMarkup) out.append("*")
-                    out.append(boldText)
-                    if (showMarkup) out.append("*")
-                    // Optional: span for live preview
+                    val monoStart = out.length
+                    out.append(monoUnicode)
+                    val monoEnd = out.length
+
+                    val closeStart = out.length
+                    out.append("```")
                     out.setSpan(
-                        StyleSpan(Typeface.BOLD),
-                        start + if (showMarkup) 1 else 0,
-                        out.length - if (showMarkup) 1 else 0,
+                        ForegroundColorSpan(foregroundColorSpan),
+                        closeStart,
+                        closeStart + 3,
                         Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
                     )
-                }
-
-                // 3: italic
-                content.startsWith('_') -> {
-                    val innerText = content.substring(1, content.length - 1)
-                    val italicText = TextFormatter.toUnicodeItalic(innerText)
-                    if (showMarkup) out.append("_")
-                    out.append(italicText)
-                    if (showMarkup) out.append("_")
-                    out.setSpan(
-                        StyleSpan(Typeface.ITALIC),
-                        start + if (showMarkup) 1 else 0,
-                        out.length - if (showMarkup) 1 else 0,
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-                    )
-                }
-
-                // 4: strike
-                content.startsWith('~') -> {
-                    val innerText = content.substring(1, content.length - 1)
-                    val strikeText = TextFormatter.toUnicodeStrikethrough(innerText)
-                    if (showMarkup) out.append("~")
-                    out.append(strikeText)
-                    if (showMarkup) out.append("~")
-                    out.setSpan(
-                        StrikethroughSpan(),
-                        start + if (showMarkup) 1 else 0,
-                        out.length - if (showMarkup) 1 else 0,
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-                    )
-                }
-
-                // 5: inline code
-                content.startsWith('`') -> {
-
-                    val innerText = content.substring(1, content.length - 1)
-                    val mono = TextFormatter.toUnicodeInlineCode(innerText)
-
-                    val startingLength = out.length   // <--- REAL start before adding anything
-
-                    if (showMarkup) out.append("`")
-                    out.append(mono)
-                    if (showMarkup) out.append("`")
-
-                    val endingLength = out.length     // <--- REAL end after adding everything
-
-                    // Correct monospace span
-                    val spanStart = startingLength + if (showMarkup) 1 else 0
-                    val spanEnd = endingLength - if (showMarkup) 1 else 0
 
                     out.setSpan(
                         TypefaceSpan("monospace"),
-                        spanStart,
-                        spanEnd,
+                        monoStart,
+                        monoEnd,
                         Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
                     )
-
                     out.setSpan(
-                        BackgroundColorSpan("#797984".toColorInt()),
-                        spanStart,
-                        spanEnd,
-                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        BackgroundColorSpan(Color.TRANSPARENT),
+                        monoStart,
+                        monoEnd,
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
                     )
                 }
+                last = match.range.last + 1
+            }
+        } else {
+            for (match in pattern.findAll(text)) {
+                if (match.range.first > last) {
+                    out.append(text.substring(last, match.range.first))
+                }
 
-                // 6: quote
-                match.groups[6] != null -> {
-                    // WhatsApp-style block quote (> text)
-                    val lines = content.split("\n")
-                    for (line in lines) {
-                        val trimmed = line.trimStart()
-                        // Only apply quote span if there is actual content after ">"
-                        if (trimmed.startsWith("> ") && trimmed.length > 2) {
-                            val cleanText = trimmed.substring(2)
+                val content = match.value
+                when {
+                    // -------------------------------------------------
+                    // 1: BOLD (*text*)
+                    // -------------------------------------------------
+                    content.startsWith('*') -> {
+                        val innerText = content.substring(1, content.length - 1)
+                        val boldText = TextFormatter.toUnicodeBold(innerText)
 
-                            val startingLength = out.length
-                            out.append(cleanText)
-                            val endingLength = out.length
+                        val startPos = out.length
 
-                            out.setSpan(
-                                CustomQuoteSpan(
-                                    stripeColor = 0xFFCCCCCC.toInt(),
-                                    stripeWidth = 10,
-                                    gapWidth = 25
-                                ),
-                                startingLength,
-                                endingLength,
-                                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-                            )
-                        } else {
-                            // If empty quote line, just append a newline (or space)
-                            out.append("\n")
+                        out.append("*")
+                        out.setSpan(ForegroundColorSpan(foregroundColorSpan), startPos, startPos + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+                        out.append(boldText)
+                        val endPos = out.length
+
+                        out.append("*")
+                        out.setSpan(ForegroundColorSpan(foregroundColorSpan), endPos, endPos + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+                        out.setSpan(StyleSpan(Typeface.BOLD), startPos + 1, endPos, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    }
+
+                    // -------------------------------------------------
+                    // 2: ITALIC (_text_)
+                    // -------------------------------------------------
+                    content.startsWith("_") -> {
+                        val innerText = content.substring(1, content.length - 1)
+                        val italicUnicode = TextFormatter.toUnicodeItalic(innerText)
+
+                        val openStart = out.length
+                        out.append("_")
+                        out.setSpan(ForegroundColorSpan(foregroundColorSpan), openStart, openStart + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+                        val italicStart = out.length
+                        out.append(italicUnicode)
+                        val italicEnd = out.length
+
+                        val closeStart = out.length
+                        out.append("_")
+                        out.setSpan(ForegroundColorSpan(foregroundColorSpan), closeStart, closeStart + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+                        out.setSpan(StyleSpan(Typeface.ITALIC), italicStart, italicEnd, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    }
+
+                    // -------------------------------------------------
+                    // 3: STRIKETHROUGH (~text~)
+                    // -------------------------------------------------
+                    content.startsWith("~") -> {
+                        val innerText = content.substring(1, content.length - 1)
+                        val strikeUnicode = TextFormatter.toUnicodeStrikethrough(innerText)
+
+                        val openStart = out.length
+                        out.append("~")
+                        out.setSpan(ForegroundColorSpan(foregroundColorSpan), openStart, openStart + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+                        val strikeStart = out.length
+                        out.append(strikeUnicode)
+                        val strikeEnd = out.length
+
+                        val closeStart = out.length
+                        out.append("~")
+                        out.setSpan(ForegroundColorSpan(foregroundColorSpan), closeStart, closeStart + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+                        out.setSpan(StrikethroughSpan(), strikeStart, strikeEnd, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    }
+
+                    // -------------------------------------------------
+                    // 4: INLINE CODE (`code`)
+                    // -------------------------------------------------
+                    content.startsWith("`") -> {
+                        val innerText = content.substring(1, content.length - 1)
+                        val monoUnicode = TextFormatter.toUnicodeInlineCode(innerText)
+
+                        val openStart = out.length
+                        out.append("`")
+                        out.setSpan(ForegroundColorSpan(foregroundColorSpan), openStart, openStart + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+                        val monoStart = out.length
+                        out.append(monoUnicode)
+                        val monoEnd = out.length
+
+                        val closeStart = out.length
+                        out.append("`")
+                        out.setSpan(ForegroundColorSpan(foregroundColorSpan), closeStart, closeStart + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+                        out.setSpan(TypefaceSpan("monospace"), monoStart, monoEnd, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        out.setSpan(BackgroundColorSpan(backgroundColorSpan), monoStart, monoEnd, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    }
+
+                    // -------------------------------------------------
+                    // 5: QUOTES (> text)
+                    // -------------------------------------------------
+                    match.groups[6] != null -> {
+                        val lines = content.split("\n")
+                        for (line in lines) {
+                            val trimmed = line.trimStart()
+                            if (trimmed.startsWith("> ") && trimmed.length > 2) {
+                                val cleanText = trimmed.substring(2)
+
+                                val s = out.length
+                                out.append(cleanText)
+                                val e = out.length
+
+                                out.setSpan(CustomQuoteSpan(0xFFCCCCCC.toInt(), 10, 25), s, e, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                            } else {
+                                out.append("\n")
+                            }
+                            if (line != lines.last()) out.append("\n")
                         }
-
-                        if (line != lines.last()) out.append("\n")
                     }
                 }
-
-                // 7: Numbered list
-                match.groups[7] != null -> {
-                    val number = match.groups[7]!!.value   // "1"
-                    val textPart = match.groups[8]!!.value // "Hello world"
-
-                    val startN = out.length
-                    out.append("$number. $textPart")
-                    val endN = out.length
-
-                    // WhatsApp-style indent
-                    out.setSpan(
-                        LeadingMarginSpan.Standard(40),    // indent amount
-                        startN,
-                        endN,
-                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-                    )
-
-                    // Optional: bold number if you want
-                    out.setSpan(
-                        StyleSpan(Typeface.BOLD),
-                        startN,
-                        startN + number.length + 1, // covers "1."
-                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-                    )
-                }
+                last = match.range.last + 1
             }
-            last = match.range.last + 1
         }
         if (last < text.length) {
             out.append(text.substring(last))
