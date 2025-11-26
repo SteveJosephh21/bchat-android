@@ -59,7 +59,7 @@
                     android:hint="@string/ConversationActivity_message"
                     android:textColor="@color/text"
                     android:textSize="@dimen/small_font_size"
-                    android:inputType="textNoSuggestions"/>
+                    android:inputType="textNoSuggestions|textMultiLine"/>
 
                 <RelativeLayout
                     android:id="@+id/payAsYouChatLayout"
