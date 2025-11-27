@@ -1,44 +1,46 @@
 package io.beldex.bchat.textformatter
 
-
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.text.style.LeadingMarginSpan
+import android.text.style.ReplacementSpan
 
 class CustomQuoteSpan(
     private val stripeColor: Int = 0xFFCCCCCC.toInt(), // light gray
-    private val stripeWidth: Int = 6,                 // thin vertical stripe
-    private val gapWidth: Int = 16,                   // space between stripe and text
-    private val backgroundColor: Int = 0xFFECECEC.toInt()
-) : LeadingMarginSpan {
+    private val stripeWidth: Float = 6f,               // thin vertical stripe
+) : ReplacementSpan() {
 
-    override fun getLeadingMargin(first: Boolean) = stripeWidth + gapWidth
-
-    override fun drawLeadingMargin(
-        c: Canvas,
-        p: Paint,
-        x: Int,
-        dir: Int,
-        top: Int,
-        baseline: Int,
-        bottom: Int,
-        text: CharSequence,
+    override fun getSize(
+        paint: Paint,
+        text: CharSequence?,
         start: Int,
         end: Int,
-        first: Boolean,
-        layout: android.text.Layout
+        fm: Paint.FontMetricsInt?
+    ): Int {
+        // Width for the vertical bar + some padding
+        return paint.measureText("│ ").toInt()
+    }
+
+    override fun draw(
+        canvas: Canvas,
+        text: CharSequence?,
+        start: Int,
+        end: Int,
+        x: Float,
+        top: Int,
+        y: Int,
+        bottom: Int,
+        paint: Paint
     ) {
-        val style = p.style
-        val oldColor = p.color
+        val oldColor = paint.color
+        val strokeWidth = paint.strokeWidth
 
-        // Draw the stripe
-        p.style = Paint.Style.FILL
-        p.color = stripeColor
-        val left = x.toFloat()
-        val right = (x + dir * stripeWidth).toFloat()
-        c.drawRect(left, top.toFloat(), right, bottom.toFloat(), p)
+        paint.color = stripeColor
+        paint.strokeWidth = stripeWidth
 
-        p.style = style
-        p.color = oldColor
+        // Draw vertical bar
+        canvas.drawLine(x + 10, top.toFloat(), x + 10, bottom.toFloat(), paint)
+
+        paint.color = oldColor
+        paint.strokeWidth = strokeWidth
     }
 }

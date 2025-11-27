@@ -551,8 +551,6 @@ public class MediaSendFragment extends Fragment implements ViewTreeObserver.OnGl
 
       SpannableStringBuilder formatted = TextFormatter.formatAppText(original);
       String formattedText = formatted.toString();
-      Log.d("Spannable-String Compare", "formatted=[" + formatted + "], original=[" + original + "]");
-      Log.d("Spannable-String Compare result", String.valueOf(!formattedText.equals(original)));
 
       // --- Step 2: Only update if the visible text actually changed
       if (!formattedText.equals(original)) {

@@ -1,5 +1,7 @@
 package io.beldex.bchat.textformatter
 
+import android.text.Editable
+import android.text.Spannable
 import android.text.SpannableString
 import android.text.SpannableStringBuilder
 import android.text.Spanned
@@ -48,27 +50,7 @@ object TextFormatter {
             toUnicodeStrikethrough(match.groupValues[1])
         }
 
-        applyRegexSpan(
-            builder,
-            Regex("(?m)^> ?(.*)$")
-        ) { match ->
-            val content = match.groupValues[1]   // "text"
-
-            // Build a new spannable for the replacement
-            val sb = SpannableStringBuilder(content)
-
-            sb.setSpan(
-                CustomQuoteSpan(
-                    stripeColor = 0xFFCCCCCC.toInt(),
-                    stripeWidth = 10,
-                    gapWidth = 25
-                ),
-                0,
-                content.length,
-                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-            )
-            sb
-        }
+        toUnicodeBlockQuote(builder)
 
         return builder
     }
@@ -202,6 +184,22 @@ object TextFormatter {
                 append(c)
                 append('\u0336') // Unicode combining long stroke overlay
             }
+        }
+    }
+
+    fun toUnicodeBlockQuote(builder: Editable) {
+        // Remove previous spans
+        val spans = builder.getSpans(0, builder.length, CustomQuoteSpan::class.java)
+        spans.forEach { builder.removeSpan(it) }
+        // Find occurrences of "> "
+        val regex = Regex("> ")
+        regex.findAll(builder).forEach { match ->
+            builder.setSpan(
+                CustomQuoteSpan(),
+                match.range.first,
+                match.range.last + 1,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
         }
     }
 }

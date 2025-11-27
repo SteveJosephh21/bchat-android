@@ -4,7 +4,6 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.text.Spannable
 import android.text.SpannableStringBuilder
-import android.text.Spanned
 import android.text.style.BackgroundColorSpan
 import android.text.style.StrikethroughSpan
 import android.text.style.StyleSpan
@@ -21,8 +20,7 @@ class AppTextFormatter(private val text: String) {
                 "\\*([^*]+)\\*|" +           // 1: bold
                 "_([^_]+)_|" +               // 2: italic
                 "~([^~]+)~|" +               // 3: strike
-                "(`[^`]+`)|" +               // 4: inline code
-                "(?:^|\\n)(> .+?)$"          // 5: Block quote
+                "(`[^`]+`)$"                 // 4: inline code
     )
 
     @SuppressLint("UseKtx")
@@ -176,28 +174,6 @@ class AppTextFormatter(private val text: String) {
 
                         out.setSpan(TypefaceSpan("monospace"), monoStart, monoEnd, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
                         out.setSpan(BackgroundColorSpan(backgroundColorSpan), monoStart, monoEnd, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-                    }
-
-                    // -------------------------------------------------
-                    // 5: QUOTES (> text)
-                    // -------------------------------------------------
-                    match.groups[5] != null -> {
-                        val lines = content.split("\n")
-                        for (line in lines) {
-                            val trimmed = line.trimStart()
-                            if (trimmed.startsWith("> ") && trimmed.length > 2) {
-                                val cleanText = trimmed.substring(2)
-
-                                val s = out.length
-                                out.append(cleanText)
-                                val e = out.length
-
-                                out.setSpan(CustomQuoteSpan(0xFFCCCCCC.toInt(), 10, 25), s, e, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                            } else {
-                                out.append("\n")
-                            }
-                            if (line != lines.last()) out.append("\n")
-                        }
                     }
                 }
                 last = match.range.last + 1

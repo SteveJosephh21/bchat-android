@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.res.Resources
 import android.net.Uri
 import android.util.AttributeSet
-import android.util.Log
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import androidx.appcompat.widget.AppCompatEditText
@@ -12,6 +11,7 @@ import androidx.core.view.inputmethod.EditorInfoCompat
 import androidx.core.view.inputmethod.InputConnectionCompat
 import io.beldex.bchat.conversation.v2.utilities.TextUtilities
 import io.beldex.bchat.textformatter.TextFormatter
+import io.beldex.bchat.textformatter.TextFormatter.toUnicodeBlockQuote
 import io.beldex.bchat.util.toPx
 import kotlin.math.max
 import kotlin.math.min
@@ -35,6 +35,7 @@ class InputBarEditText : AppCompatEditText {
     )
 
     private var isFormatting = false
+    private var isBlocQuote = false
 
     override fun onTextChanged(text: CharSequence, start: Int, lengthBefore: Int, lengthAfter: Int) {
         super.onTextChanged(text, start, lengthBefore, lengthAfter)
@@ -86,6 +87,11 @@ class InputBarEditText : AppCompatEditText {
 
             isFormatting = false
         }
+
+        // -------------------------------------------------
+        // 5: QUOTES (> text)
+        // -------------------------------------------------
+        toUnicodeBlockQuote(editable)
 
         // --- Notify delegate about text changes ---
         delegate?.inputBarEditTextContentChanged(editable.toString())
