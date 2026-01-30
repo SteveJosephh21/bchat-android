@@ -29,6 +29,7 @@ import io.beldex.bchat.util.setUpActionBarBchatLogo
 import io.beldex.bchat.wallet.CheckOnline
 import io.beldex.bchat.R
 import io.beldex.bchat.databinding.ActivityDisplayNameBinding
+import io.beldex.bchat.util.Utils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -50,7 +51,6 @@ class DisplayNameActivity : BaseActionBarActivity() {
     private val PREF_DAEMON_TESTNET = "daemon_testnet"
     private val PREF_DAEMON_STAGENET = "daemon_stagenet"
     private val PREF_DAEMON_MAINNET = "daemon_mainnet"
-    private val namePattern = Pattern.compile("[A-Za-z0-9\\s]+")
 
     private var node: NodeInfo? = null
 
@@ -186,7 +186,7 @@ class DisplayNameActivity : BaseActionBarActivity() {
         return favouriteNodes
     }
 
-    private fun autoselect(nodes: Set<NodeInfo?>): NodeInfo? {
+    private fun autoSelect(nodes: Set<NodeInfo?>): NodeInfo? {
         if (nodes.isEmpty()) return null
         NodePinger.execute(nodes, null)
         val nodeList: List<NodeInfo?> = ArrayList<NodeInfo?>(nodes)
@@ -235,7 +235,7 @@ class DisplayNameActivity : BaseActionBarActivity() {
 
             var selectedNode: NodeInfo?
             if (params[0] == FIND_BEST) {
-                selectedNode = displayNameActivity.autoselect(favourites)
+                selectedNode = displayNameActivity.autoSelect(favourites)
             } else if (params[0] == PING_SELECTED) {
                 selectedNode = displayNameActivity.getNode()
                 if (!displayNameActivity.getFavouriteNodes1()
@@ -248,18 +248,15 @@ class DisplayNameActivity : BaseActionBarActivity() {
                         break
                     }
                 }
-                if (selectedNode == null) { // autoselect
-                    selectedNode = displayNameActivity.autoselect(favourites)
+                if (selectedNode == null) {
+                    selectedNode = displayNameActivity.autoSelect(favourites)
                 } else
                     selectedNode.testRpcService()
             } else throw java.lang.IllegalStateException()
             return if (selectedNode != null && selectedNode.isValid) {
-                Timber.d("Testing-->12")
-                Log.d("Testing-->12 ","$selectedNode")
                 displayNameActivity.setNode(selectedNode)
                 selectedNode
             } else {
-                Timber.d("Testing-->13")
                 displayNameActivity.setNode(null)
                 null
             }
@@ -285,8 +282,6 @@ class DisplayNameActivity : BaseActionBarActivity() {
             }
             this.node = node
             for (nodeInfo in favouriteNodes) {
-                Timber.d("Testing-->14")
-                //Important
                 nodeInfo.setSelected(nodeInfo === node)
             }
             WalletManager.getInstance().setDaemon(node)
@@ -340,7 +335,7 @@ class DisplayNameActivity : BaseActionBarActivity() {
                 removeWallet()
             }
         }
-        if (!displayName.matches(namePattern.toRegex())) {
+        if (!displayName.matches(Utils.namePattern.toRegex())) {
             return Toast.makeText(
                     this,
                     R.string.display_name_validation,

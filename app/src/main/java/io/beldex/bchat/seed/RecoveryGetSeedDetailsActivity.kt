@@ -43,6 +43,7 @@ import io.beldex.bchat.util.setUpActionBarBchatLogo
 import io.beldex.bchat.wallet.CheckOnline
 import io.beldex.bchat.R
 import io.beldex.bchat.databinding.ActivityRecoveryGetSeedDetailsBinding
+import io.beldex.bchat.util.Utils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -82,7 +83,6 @@ class RecoveryGetSeedDetailsActivity :  BaseActionBarActivity() {
 
     private var restoreFromDateHeight = 0
     private val dateFormat = SimpleDateFormat("yyyy-MM", Locale.US)
-    private val namePattern = Pattern.compile("[A-Za-z0-9\\s]+")
     private val myFormat = "yyyy-MM-dd" // mention the format you need
     val sdf = SimpleDateFormat(myFormat, Locale.US)
 
@@ -259,7 +259,7 @@ class RecoveryGetSeedDetailsActivity :  BaseActionBarActivity() {
             return Toast.makeText(this, R.string.activity_display_name_display_name_too_long_error, Toast.LENGTH_SHORT).show()
         }
 
-        if (!displayName.matches(namePattern.toRegex())) {
+        if (!displayName.matches(Utils.namePattern.toRegex())) {
             return Toast.makeText(
                     this,
                     R.string.display_name_validation,
@@ -379,7 +379,7 @@ class RecoveryGetSeedDetailsActivity :  BaseActionBarActivity() {
         return favouriteNodes
     }
 
-    private fun autoselect(nodes: Set<NodeInfo?>): NodeInfo? {
+    private fun autoSelect(nodes: Set<NodeInfo?>): NodeInfo? {
         if (nodes.isEmpty()) return null
         NodePinger.execute(nodes, null)
         val nodeList: List<NodeInfo?> = ArrayList<NodeInfo?>(nodes)
@@ -428,7 +428,7 @@ class RecoveryGetSeedDetailsActivity :  BaseActionBarActivity() {
 
             var selectedNode: NodeInfo?
             if (params[0] == FIND_BEST) {
-                selectedNode = recoveryGetSeedDetailsActivity.autoselect(favourites)
+                selectedNode = recoveryGetSeedDetailsActivity.autoSelect(favourites)
             } else if (params[0] == PING_SELECTED) {
                 selectedNode = recoveryGetSeedDetailsActivity.getNode()
                 if (!recoveryGetSeedDetailsActivity.getFavouriteNodes1()
@@ -441,8 +441,8 @@ class RecoveryGetSeedDetailsActivity :  BaseActionBarActivity() {
                         break
                     }
                 }
-                if (selectedNode == null) { // autoselect
-                    selectedNode = recoveryGetSeedDetailsActivity.autoselect(favourites)
+                if (selectedNode == null) {
+                    selectedNode = recoveryGetSeedDetailsActivity.autoSelect(favourites)
                 } else
                     selectedNode.testRpcService()
             } else throw java.lang.IllegalStateException()
@@ -475,7 +475,6 @@ class RecoveryGetSeedDetailsActivity :  BaseActionBarActivity() {
             }
             this.node = node
             for (nodeInfo in favouriteNodes) {
-                Timber.d("Testing-->14 ${node.toString()}")
                 //Important
                 nodeInfo.isSelected = nodeInfo === node
             }

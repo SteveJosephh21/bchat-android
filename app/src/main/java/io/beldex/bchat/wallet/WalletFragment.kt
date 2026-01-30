@@ -29,7 +29,6 @@ import io.beldex.bchat.model.TransactionInfo
 import io.beldex.bchat.model.Wallet
 import io.beldex.bchat.util.BChatThreadPoolExecutor
 import io.beldex.bchat.util.Helper
-import io.beldex.bchat.util.NodePinger
 import io.beldex.bchat.wallet.jetpackcomposeUI.WalletDashBoardScreen
 import io.beldex.bchat.wallet.jetpackcomposeUI.WalletViewModels
 import io.beldex.bchat.wallet.utils.common.fetchPriceFor
@@ -43,7 +42,6 @@ import java.io.IOException
 import java.lang.ClassCastException
 import java.math.BigDecimal
 import java.text.NumberFormat
-import java.util.*
 import kotlin.collections.ArrayList
 import java.util.concurrent.Executor
 
@@ -298,19 +296,6 @@ class WalletFragment : Fragment(),OnBackPressedListener {
         override fun onPostExecute(result: Boolean?) {
             refreshBalance(wallet.isSynchronized)
         }
-    }
-
-    fun autoselect(nodes: Set<NodeInfo?>): NodeInfo? {
-        if (nodes.isEmpty()) return null
-        NodePinger.execute(nodes, null)
-        val nodeList: ArrayList<NodeInfo?> = ArrayList<NodeInfo?>(nodes)
-        Collections.sort(nodeList, NodeInfo.BestNodeComparator)
-        val rnd = Random().nextInt(nodeList.size)
-        return nodeList[rnd]
-    }
-
-    override fun onPause() {
-        super.onPause()
     }
 
     companion object{
@@ -657,7 +642,6 @@ class WalletFragment : Fragment(),OnBackPressedListener {
         val daemonHeight: Long
 
         fun onSendRequest()
-        fun onTxDetailsRequest(view: View?, info: TransactionInfo?)
         val isSynced: Boolean
         val isStreetMode: Boolean
         val streetModeHeight: Long

@@ -46,6 +46,12 @@ class ProfilePictureView @JvmOverloads constructor(
         ResourceContactPhoto(R.drawable.ic_profile_default)
             .asDrawable(context, ContactColors.UNKNOWN_COLOR.toConversationColor(context), false, resourcePadding)
     }
+
+    private val invalidRecipientDrawable by lazy {
+        ResourceContactPhoto(R.drawable.ic_profile)
+            .asDrawable(context, ContactColors.UNKNOWN_COLOR.toConversationColor(context), false, resourcePadding)
+    }
+
     private val unknownOpenGroupDrawable by lazy {
         ResourceContactPhoto(R.drawable.ic_notification_)
             .asDrawable(context, ContactColors.UNKNOWN_COLOR.toConversationColor(context), false, resourcePadding)
@@ -185,15 +191,7 @@ class ProfilePictureView @JvmOverloads constructor(
     private fun setProfilePictureIfNeeded(imageView: ImageView, publicKey: String, displayName: String?, @DimenRes sizeResId: Int, isBnsTag:Boolean = false) {
         if (publicKey.isNotEmpty()) {
             val recipient = Recipient.from(context, Address.fromSerialized(publicKey), false)
-            if(isBnsTag) {
-                if (profilePicturesCacheWithBnsTag.containsKey(publicKey) && profilePicturesCacheWithBnsTag[publicKey] == recipient.profileAvatar) {
-                    return
-                }
-            }else {
-                if (profilePicturesCache.containsKey(publicKey) && profilePicturesCache[publicKey] == recipient.profileAvatar) {
-                    return
-                }
-            }
+            if(shouldSkipProfileAvatarUpdate(recipient, isBnsTag)) return
             val signalProfilePicture = recipient.contactPhoto
             val avatar = (signalProfilePicture as? ProfileContactPhoto)?.avatarObject
 
@@ -217,11 +215,6 @@ class ProfilePictureView @JvmOverloads constructor(
             } else {
                 val placeholder = PlaceholderAvatarPhoto(publicKey, displayName ?: "${publicKey.take(4)}...${publicKey.takeLast(4)}")
                 glide.clear(imageView)
-                //New Line
-                /*glide.load(AvatarPlaceholderGenerator.generate(context, sizeInPX, publicKey, displayName)).diskCacheStrategy(DiskCacheStrategy.ALL).transform(
-                    CenterInside(),
-                    GranularRoundedCorners(20f, 20f, 20f, 20f)
-                ).into(imageView)*/
                 glide.load(placeholder)
                     .placeholder(unknownRecipientDrawable)
                     .diskCacheStrategy(DiskCacheStrategy.NONE).transform(
@@ -242,6 +235,12 @@ class ProfilePictureView @JvmOverloads constructor(
     fun recycle() {
         profilePicturesCache.clear()
         profilePicturesCacheWithBnsTag.clear()
+    }
+
+    private fun shouldSkipProfileAvatarUpdate(recipient: Recipient, isBnsTag: Boolean): Boolean {
+        val key = recipient.address.toString()
+        val cache = if (isBnsTag) profilePicturesCacheWithBnsTag else profilePicturesCache
+        return cache.containsKey(key) && cache[key] == recipient.profileAvatar
     }
     // endregion
 }

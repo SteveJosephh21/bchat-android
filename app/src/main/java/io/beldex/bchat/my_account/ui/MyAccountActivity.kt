@@ -146,6 +146,7 @@ import io.beldex.bchat.util.FileProviderUtil
 import io.beldex.bchat.util.QRCodeUtilities
 import io.beldex.bchat.util.UiMode
 import io.beldex.bchat.util.UiModeUtilities
+import io.beldex.bchat.util.Utils
 import io.beldex.bchat.util.copyToClipBoard
 import io.beldex.bchat.util.toPx
 import io.beldex.bchat.wallet.CheckOnline
@@ -415,7 +416,6 @@ fun MyAccountNavHost(
     }
 
      fun saveDisplayName(displayName: String, context : Context): Boolean {
-         val namePattern = Pattern.compile("[A-Za-z0-9\\s]+")
         if (displayName.isEmpty()) {
             Toast.makeText(
                 context,
@@ -432,7 +432,7 @@ fun MyAccountNavHost(
             ).show()
             return false
         }
-        if (!displayName.matches(namePattern.toRegex())) {
+        if (!displayName.matches(Utils.namePattern.toRegex())) {
             Toast.makeText(
                 context,
                 R.string.display_name_validation,

@@ -175,10 +175,9 @@ class WalletService : Service() {
         fun onProgress(n: Float)
         fun onWalletStored(success: Boolean)
         fun onTransactionCreated(tag: String?, pendingTransaction: PendingTransaction?)
-        fun onTransactionSent(txid: String?)
+        fun onTransactionSent(txId: String?)
         fun onSendTransactionFailed(error: String?)
         fun onWalletStarted(walletStatus: Wallet.Status?)
-        fun onWalletOpen(device: Wallet.Device?)
         fun onWalletFinish()
     }
 
@@ -351,23 +350,23 @@ class WalletService : Service() {
                                      sendBroadCast(bundle)
                                      return
                                  }
-                                 val txid =
+                                 val txId =
                                      pendingTransaction.firstTxId // tx ids vanish after commit()!
                                  val success = pendingTransaction.commit("", true)
                                  if (success) {
                                      myWallet.disposePendingTransaction()
-                                     if (observer != null) observer!!.onTransactionSent(txid)
+                                     if (observer != null) observer!!.onTransactionSent(txId)
                                      val bundle = Bundle()
                                      bundle.putSerializable(
                                          "type",
                                          WalletCallbackType.TransactionSent
                                      )
-                                     bundle.putString("data", txid)
+                                     bundle.putString("data", txId)
                                      sendBroadCast(bundle)
                                      val notes =
                                          extras.getString(REQUEST_CMD_SEND_NOTES)
-                                     if (notes != null && !notes.isEmpty()) {
-                                         myWallet.setUserNote(txid, notes)
+                                     if (!notes.isNullOrEmpty()) {
+                                         myWallet.setUserNote(txId, notes)
                                      }
                                      try {
                                          val rc = myWallet.store()

@@ -82,6 +82,7 @@ import io.beldex.bchat.dependencies.DatabaseComponent
 import io.beldex.bchat.wallet.CheckOnline
 import io.beldex.bchat.R
 import io.beldex.bchat.conversation.v2.contact_sharing.capitalizeFirstLetter
+import io.beldex.bchat.util.Utils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -274,23 +275,41 @@ fun CreateSecretGroup(
             ) {
                 PrimaryButton(
                     onClick = {
-                        if(isButtonEnabled) {
-                            keyboardController?.hide()
-                            isButtonEnabled = false
-                            scope.launch(Dispatchers.Main) {
-                                if(CheckOnline.isOnline(context)) {
-                                    createClosedGroup(device, groupName.trim(), context, activity, selectedContact, showLoader={
-                                        showLoader=it
-                                    })
-                                }else {
-                                    Toast.makeText(context, context.getString(R.string.please_check_your_internet_connection), Toast.LENGTH_SHORT).show()
-                                }
-                                delay(2000)
+                        if(!isButtonEnabled) return@PrimaryButton
+
+                        keyboardController?.hide()
+                        isButtonEnabled = false
+
+                        scope.launch(Dispatchers.Main) {
+                            val trimmedGroupName = groupName.trim()
+                            if(!CheckOnline.isOnline(context)) {
+                                Toast.makeText(context, context.getString(R.string.please_check_your_internet_connection), Toast.LENGTH_SHORT).show()
                                 isButtonEnabled = true
+                                return@launch
                             }
+
+                            if(!trimmedGroupName.matches(Utils.namePattern.toRegex())) {
+                                Toast.makeText(
+                                    context,
+                                    R.string.activity_edit_closed_group_group_name_invalid_start_char_error,
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                isButtonEnabled = true
+                                return@launch
+                            }
+
+                            createClosedGroup(
+                                device,
+                                trimmedGroupName,
+                                context,
+                                activity,
+                                selectedContact,
+                                showLoader = { showLoader = it },
+                                onComplete = {
+                                    isButtonEnabled = true
+                                }
+                            )
                         }
-
-
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -420,59 +439,88 @@ private fun createClosedGroup(
     context: Context,
     activity: Activity?,
     selected: Collection<String>,
-    showLoader: (status : Boolean) -> Unit
+    showLoader: (Boolean) -> Unit,
+    onComplete: () -> Unit
 ) {
-    if (name.isEmpty()) {
-        return Toast.makeText(
-            context,
-            R.string.activity_create_closed_group_group_name_missing_error,
-            Toast.LENGTH_LONG
-        ).show()
-    }
-    else if (name.length >= 26) {
-        return Toast.makeText(
-            context,
-            R.string.activity_create_closed_group_group_name_too_long_error,
-            Toast.LENGTH_LONG
-        ).show()
-    }
-    else if (selected.isEmpty()) {
-        return Toast.makeText(
-            context,
-            R.string.activity_create_closed_group_not_enough_group_members_error,
-            Toast.LENGTH_LONG
-        ).show()
-    }
-    else if (selected.count() >= groupSizeLimit) { // Minus one because we're going to include self later
-        return Toast.makeText(
-            context,
-            R.string.activity_create_closed_group_too_many_group_members_error,
-            Toast.LENGTH_LONG
-        ).show()
-    }else {
-        showLoader(true)
-        val userPublicKey = TextSecurePreferences.getLocalNumber(context)!!
-        MessageSender.createClosedGroup(device, name, selected + setOf(userPublicKey))
-            .successUi { groupID ->
-                val threadID =
-                    DatabaseComponent.get(context).threadDatabase().getOrCreateThreadIdFor(
-                        Recipient.from(context, Address.fromSerialized(groupID), false)
-                    )
-                if (!activity!!.isFinishing) {
-                    openConversationActivity(
-                        threadID,
-                        Recipient.from(context, Address.fromSerialized(groupID), false),
-                        activity
-                    )
-                    showLoader(false)
-                    activity.finish()
-                }
-            }.failUi {
-                showLoader(false)
-            Toast.makeText(context, it.message, Toast.LENGTH_LONG).show()
+    when {
+        name.isEmpty() -> {
+            Toast.makeText(
+                context,
+                R.string.activity_create_closed_group_group_name_missing_error,
+                Toast.LENGTH_LONG
+            ).show()
+            onComplete()
+            return
+        }
+
+        name.length >= 26 -> {
+            Toast.makeText(
+                context,
+                R.string.activity_create_closed_group_group_name_too_long_error,
+                Toast.LENGTH_LONG
+            ).show()
+            onComplete()
+            return
+        }
+
+        selected.isEmpty() -> {
+            Toast.makeText(
+                context,
+                R.string.activity_create_closed_group_not_enough_group_members_error,
+                Toast.LENGTH_LONG
+            ).show()
+            onComplete()
+            return
+        }
+
+        selected.size >= groupSizeLimit -> {
+            Toast.makeText(
+                context,
+                R.string.activity_create_closed_group_too_many_group_members_error,
+                Toast.LENGTH_LONG
+            ).show()
+            onComplete()
+            return
         }
     }
+
+    showLoader(true)
+
+    val userPublicKey = TextSecurePreferences.getLocalNumber(context) ?: run {
+        showLoader(false)
+        onComplete()
+        return
+    }
+
+    MessageSender.createClosedGroup(device, name, selected + setOf(userPublicKey))
+        .successUi { groupID ->
+            showLoader(false)
+
+            activity?.takeIf { !it.isFinishing }?.let {
+                val recipient = Recipient.from(
+                    context,
+                    Address.fromSerialized(groupID),
+                    false
+                )
+
+                val threadID = DatabaseComponent
+                    .get(context)
+                    .threadDatabase()
+                    .getOrCreateThreadIdFor(recipient)
+
+                openConversationActivity(threadID, recipient, it)
+                it.finish()
+            }
+
+            onComplete()
+        }
+        .failUi { error ->
+            showLoader(false)
+            Toast.makeText(context, error.message, Toast.LENGTH_LONG).show()
+            onComplete()
+        }
 }
+
 
 
 /*@Preview(uiMode = Configuration.UI_MODE_NIGHT_YES)

@@ -267,7 +267,7 @@ public class  NodeInfo extends Node implements Serializable {
         } catch (IOException | JSONException ex) {
             Timber.d(ex);
         } finally {
-            Timber.d("Testing-->6");
+            Timber.d("Testing Mainnet finally");
         }
         return false;
     }

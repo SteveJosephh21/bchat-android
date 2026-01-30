@@ -116,14 +116,6 @@
             android:screenOrientation="portrait"
             android:theme="@style/Theme.Bchat.DayNight.FlatActionBar" />
         <activity
-            android:name="io.beldex.bchat.wallet.node.activity.NodeActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name="io.beldex.bchat.wallet.settings.WalletSettings"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-        <activity
             android:name="io.beldex.bchat.wallet.utils.pincodeview.CustomPinActivity"
             android:exported="false"
             android:screenOrientation="portrait"

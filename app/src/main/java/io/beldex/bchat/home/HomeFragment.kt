@@ -163,6 +163,8 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
                     putBoolean(ConversationFragmentV2.SHORTCUT_LAUNCHER,shortcut)
                 }
             }
+        const val PING_SELECTED = 0
+        const val FIND_BEST = 1
     }
 
     val homeViewModel: HomeFragmentViewModel by viewModels()
@@ -334,18 +336,15 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        //New Line
         viewModel = ViewModelProvider(requireActivity())[CallViewModel::class.java]
         archiveChatViewModel = ViewModelProvider(requireActivity())[ArchiveChatViewModel::class.java]
 
-        // Set up Glide
         glide = Glide.with(this)
-        // Set up toolbar buttons
         binding.profileButton.root.glide = glide
-        //New Line
-        // Setup Recyclerview's Layout
+
         binding.navigationMenu.navigationRv.layoutManager = LinearLayoutManager(requireActivity().applicationContext)
         binding.navigationMenu.navigationRv.setHasFixedSize(true)
+
         updateAdapter(0)
         // Add Item Touch Listener
         binding.navigationMenu.navigationRv.addOnItemTouchListener(RecyclerTouchListener(requireActivity().applicationContext, object :
@@ -416,23 +415,24 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
 
         binding.navigationMenu.drawerAppearanceToggleButton.setOnClickListener{
             if(binding.navigationMenu.drawerAppearanceToggleButton.isChecked){
-                val uiMode = UiMode.values()[1]
+                val uiMode = UiMode.entries[1]
                 UiModeUtilities.setUserSelectedUiMode(requireActivity(), uiMode)
             }
             else{
-                val uiMode = UiMode.values()[0]
+                val uiMode = UiMode.entries[0]
                 UiModeUtilities.setUserSelectedUiMode(requireActivity(), uiMode)
             }
         }
         binding.navigationMenu.drawerAppearanceToggleButton.setOnTouchListener { _, event ->
             event.actionMasked == MotionEvent.ACTION_MOVE
         }
-        binding.navigationMenu.profileContainer.setOnClickListener{
-            openSettings()
+        listOf(
+            binding.navigationMenu.profileContainer,
+            binding.navigationMenu.drawerProfileIcon.root
+        ).forEach { view ->
+            view.setOnClickListener { openSettings() }
         }
-        binding.navigationMenu.drawerProfileIcon.root.setOnClickListener {
-            openSettings()
-        }
+
         binding.navigationMenu.drawerProfileIcon.root.glide = glide
         binding.navigationMenu.drawerProfileIcon.root.isClickable = true
         binding.navigationMenu.drawerProfileId.text = String.format(requireContext().resources.getString(R.string.id_format), hexEncodedPublicKey)
@@ -524,19 +524,16 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
             }
             homeAdapter.data = newData
             if(firstPos >= 0) { manager.scrollToPositionWithOffset(firstPos, offsetTop) }
-            //setupMessageRequestsBanner()
             updateEmptyState()
         }
         ApplicationContext.getInstance(requireActivity()).typingStatusRepository.typingThreads.observe(requireActivity()) { threadIds ->
             homeAdapter.typingThreadIDs = (threadIds ?: setOf())
         }
         homeViewModel.tryUpdateChannel()
-        // Set up new conversation button set
-//        binding.newConversationButtonSet.delegate = this
         // Observe blocked contacts changed events
         val broadcastReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
-                binding.recyclerView.adapter!!.notifyDataSetChanged()
+                updateRecyclerViewAdapter()
             }
         }
         this.broadcastReceiver = broadcastReceiver
@@ -563,8 +560,6 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
             }
         }
         binding.navigationMenu.version.text = resources.getString(R.string.version_name).format(BuildConfig.VERSION_NAME)
-        // binding.navigationMenu.uiMode.text = "Dark Mode"
-
     }
 
     private fun showArchiveChats(){
@@ -573,17 +568,12 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
             resultLauncher.launch(it)
         }
     }
-    private fun callShowQrCode(){
-        showQRCode()
-        Handler(Looper.getMainLooper()).postDelayed({
-            binding.drawerLayout.closeDrawer(GravityCompat.END)
-        }, 200)
-    }
+
     private fun registerObservers() {
         val buildingPathsReceiver: BroadcastReceiver = object : BroadcastReceiver() {
 
             override fun onReceive(context: Context, intent: Intent) {
-                handleBuildingPathsEvent()
+                handlePathsBuiltEvent()
             }
         }
         broadcastReceivers.add(buildingPathsReceiver)
@@ -598,7 +588,6 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
         LocalBroadcastManager.getInstance(requireActivity().applicationContext).registerReceiver(pathsBuiltReceiver, IntentFilter("pathsBuilt"))
     }
 
-    private fun handleBuildingPathsEvent() { update() }
     private fun handlePathsBuiltEvent() { update() }
 
     private fun update() {
@@ -621,14 +610,12 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
                 // Do nothing
             }.show()
 
-        //SteveJosephh21
         val message: TextView = dialog.findViewById(android.R.id.message)
         val messageFace: Typeface = Typeface.createFromAsset(requireActivity().assets, "fonts/open_sans_medium.ttf")
         message.typeface = messageFace
     }
 
     private fun setupCallActionBar() {
-
         val startTimeNew = viewModel!!.callStartTime
         if (startTimeNew == -1L) {
             binding.toolbarCall.isVisible = false
@@ -663,13 +650,11 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
         }
     }
 
-    //New Line
     private fun updateAdapter(highlightItemPos: Int) {
         adapter = NavigationRVAdapter(items, highlightItemPos)
         binding.navigationMenu.navigationRv.adapter = adapter
         adapter.notifyDataSetChanged()
     }
-
 
     private fun setupHeaderImage() {
         val isDayUiMode = UiModeUtilities.isDayUiMode(requireActivity())
@@ -677,41 +662,7 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
         binding.bchatHeaderImage.setTextColor(getColor(requireActivity().applicationContext,headerTint))
     }
 
-    override fun onInputFocusChanged(hasFocus: Boolean) {
-//        if (hasFocus) {
-//            setSearchShown(true)
-//        } else {
-//            setSearchShown(!binding.globalSearchInputLayout.query.value.isNullOrEmpty())
-//        }
-    }
-
-    private fun setSearchShown(isShown: Boolean) {
-        //New Line
-//        binding.searchBarLayout.isVisible = isShown
-//        binding.searchBarBackButton.setOnClickListener {
-//            binding.globalSearchInputLayout.onFocus()
-//            binding.globalSearchInputLayout.clearSearch(true)
-//            onBackPressed()
-//        }
-//
-//        binding.searchToolbar.isVisible = isShown
-//        binding.searchViewCard.isVisible = !isShown
-//        binding.bchatToolbar.isVisible = !isShown
-//        binding.recyclerView.isVisible = !isShown
-//        binding.emptyStateContainer.isVisible =
-//            (binding.recyclerView.adapter as HomeAdapter).itemCount == 0 && binding.recyclerView.isVisible
-//        binding.emptyStateContainerText.isVisible =
-//            (binding.recyclerView.adapter as HomeAdapter).itemCount == 0 && binding.recyclerView.isVisible
-//        val isDayUiMode = UiModeUtilities.isDayUiMode(requireActivity())
-//        (if (isDayUiMode) R.drawable.ic_doodle_3_2 else R.drawable.ic_doodle_3_1).also {
-//            binding.emptyStateImageView.setImageResource(
-//                it
-//            )
-//        }
-//        binding.gradientView.isVisible = !isShown
-//        binding.globalSearchRecycler.isVisible = isShown
-//        binding.newConversationButtonSet.isVisible = !isShown
-    }
+    override fun onInputFocusChanged(hasFocus: Boolean) {}
 
     override fun onResume() {
         super.onResume()
@@ -743,7 +694,7 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
 
         /*Hales63*/
         if (TextSecurePreferences.isUnBlocked(requireActivity().applicationContext)) {
-            homeAdapter.notifyDataSetChanged()
+            updateHomeAdapter()
             TextSecurePreferences.setUnBlockStatus(requireActivity().applicationContext, false)
         }
 
@@ -823,29 +774,26 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
         }
     }
 
-    fun updateAdapter(){
+    fun updateHomeAdapter(){
         homeAdapter.notifyDataSetChanged()
     }
+
+    private fun updateRecyclerViewAdapter() {
+        binding.recyclerView.adapter!!.notifyDataSetChanged()
+    }
+
     fun updateProfileButton() {
         binding.profileButton.root.publicKey = publicKey
         binding.profileButton.root.displayName = TextSecurePreferences.getProfileName(requireActivity().applicationContext)
         binding.profileButton.root.recycle()
         binding.profileButton.root.update(TextSecurePreferences.getProfileName(requireActivity().applicationContext))
 
-        //New Line
         binding.navigationMenu.drawerProfileName.text = TextSecurePreferences.getProfileName(requireActivity().applicationContext)
         binding.navigationMenu.drawerProfileIcon.root.publicKey = publicKey
         binding.navigationMenu.drawerProfileIcon.root.displayName = TextSecurePreferences.getProfileName(requireActivity().applicationContext)
         binding.navigationMenu.drawerProfileIcon.root.recycle()
         binding.navigationMenu.drawerProfileIcon.root.update(TextSecurePreferences.getProfileName(requireActivity().applicationContext))
     }
-
-    fun onBackPressed() {
-//        if (binding.globalSearchRecycler.isVisible) {
-//            binding.globalSearchInputLayout.clearSearch(true)
-//        }
-    }
-
 
     override fun onConversationClick(thread: ThreadRecord) {
         onConversationClick(thread.threadId)
@@ -889,57 +837,6 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
             return@setOnMenuItemClickListener true
         }
         popupMenu.show()
-//        val bottomSheet = ConversationOptionsBottomSheet()
-//        bottomSheet.thread = thread
-//        bottomSheet.onViewDetailsTapped = {
-//            bottomSheet.dismiss()
-//            val userDetailsBottomSheet = UserDetailsBottomSheet()
-//            val bundle = bundleOf(
-//                UserDetailsBottomSheet.ARGUMENT_PUBLIC_KEY to thread.recipient.address.toString(),
-//                UserDetailsBottomSheet.ARGUMENT_THREAD_ID to thread.threadId
-//            )
-//            userDetailsBottomSheet.arguments = bundle
-//            userDetailsBottomSheet.show(childFragmentManager, userDetailsBottomSheet.tag)
-//        }
-//        bottomSheet.onBlockTapped = {
-//            bottomSheet.dismiss()
-//            if (!thread.recipient.isBlocked) {
-//                blockConversation(thread)
-//            }
-//        }
-//        bottomSheet.onUnblockTapped = {
-//            bottomSheet.dismiss()
-//            if (thread.recipient.isBlocked) {
-//                unblockConversation(thread)
-//            }
-//        }
-//        bottomSheet.onDeleteTapped = {
-//            bottomSheet.dismiss()
-//            deleteConversation(thread)
-//        }
-//        bottomSheet.onSetMuteTapped = { muted ->
-//            bottomSheet.dismiss()
-//            setConversationMuted(thread, muted)
-//        }
-//        bottomSheet.onNotificationTapped = {
-//            bottomSheet.dismiss()
-//            NotificationUtils.showNotifyDialog(requireActivity(), thread.recipient) { notifyType ->
-//                setNotifyType(thread, notifyType)
-//            }
-//        }
-//        bottomSheet.onPinTapped = {
-//            bottomSheet.dismiss()
-//            setConversationPinned(thread.threadId, true)
-//        }
-//        bottomSheet.onUnpinTapped = {
-//            bottomSheet.dismiss()
-//            setConversationPinned(thread.threadId, false)
-//        }
-//        bottomSheet.onMarkAllAsReadTapped = {
-//            bottomSheet.dismiss()
-//            markAllAsRead(thread)
-//        }
-//        bottomSheet.show(requireActivity().supportFragmentManager, bottomSheet.tag)
     }
 
     private fun isSecretGroupIsActive(recipient: Recipient):Boolean {
@@ -1060,15 +957,6 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
         }
     }
 
-    private fun setNotifyType(thread: ThreadRecord, newNotifyType: Int) {
-        lifecycleScope.launch(Dispatchers.IO) {
-            recipientDatabase.setNotifyType(thread.recipient, newNotifyType)
-            withContext(Dispatchers.Main) {
-                binding.recyclerView.adapter!!.notifyDataSetChanged()
-            }
-        }
-    }
-
     private fun setConversationPinned(
         threadId: Long,
         pinned: Boolean
@@ -1144,13 +1032,8 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
         val connectionStatus: Wallet.ConnectionStatus?
     }
 
-    fun dispatchTouchEvent() {
-    }
-
     private fun pingSelectedNode(storeNodes : Boolean) {
-        val pingSelected = 0
-        val findBest = 1
-        AsyncFindBestNode(pingSelected, findBest,storeNodes).execute<Int>(pingSelected)
+        AsyncFindBestNode(PING_SELECTED, FIND_BEST,storeNodes).execute<Int>(PING_SELECTED)
     }
 
     inner class AsyncFindBestNode(private val pingSelected : Int, private val findBest : Int, private val storeNodes : Boolean) :
@@ -1165,7 +1048,7 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
                     )
                 var selectedNode: NodeInfo?
                 if (params[0] == findBest) {
-                    selectedNode = autoselect(favourites)
+                    selectedNode = autoSelect(favourites)
                 } else if (params[0] == pingSelected) {
                     selectedNode = activityCallback!!.getNode()
                     if (selectedNode == null) {
@@ -1176,20 +1059,17 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
                             }
                         }
                     }
-                    if (selectedNode == null) { // autoselect
-                        selectedNode = autoselect(favourites)
+                    if (selectedNode == null) {
+                        selectedNode = autoSelect(favourites)
                     } else {
-                        //Steve Josephh21
-                        if (selectedNode != null) {
-                            selectedNode.testRpcService()
-                        }
+                        selectedNode.testRpcService()
                     }
                 } else throw IllegalStateException()
                 return if (selectedNode != null && selectedNode.isValid) {
                     activityCallback!!.setNode(selectedNode)
                     selectedNode
                 } else {
-                    selectedNode = autoselect(favourites)
+                    selectedNode = autoSelect(favourites)
                     activityCallback!!.setNode(selectedNode)
                     selectedNode
                 }
@@ -1268,7 +1148,7 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
         }
     }
 
-    fun autoselect(nodes: Set<NodeInfo?>): NodeInfo? {
+    fun autoSelect(nodes: Set<NodeInfo?>): NodeInfo? {
         if (nodes.isEmpty()) return null
         NodePinger.execute(nodes, null)
         val nodeList: ArrayList<NodeInfo?> = ArrayList<NodeInfo?>(nodes)
@@ -1364,7 +1244,7 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
             extras.putString(ConversationFragmentV2.TYPE,result.data!!.getStringExtra(ConversationFragmentV2.TYPE))
             showOrHideFragment(ConversationFragmentV2(), extras, result.data!!.getLongExtra(ConversationFragmentV2.THREAD_ID,-1))
         }else {
-            homeAdapter.notifyDataSetChanged()
+            updateHomeAdapter()
         }
     }
 
@@ -1410,34 +1290,9 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
     }
 
     private fun showQRCode() {
-//        Intent(requireContext(), ShowQRCodeWithScanQRCodeActivity::class.java).also {
-//            showQRCodeWithScanQRCodeActivityResultLauncher.launch(it)
-//        }
-        //Intent(activity, MyProfileActivity::class.java).also {
-//            it.putExtra(MyAccountActivity.extraStartDestination, MyAccountScreens.MyAccountScreen.route)
-        //startActivity(it)
-        //}
-
         val intent = Intent(activity,MyProfileActivity::class.java)
         intent.putExtra("profile_editable",true)
         startActivity(intent)
-    }
-
-    private var showQRCodeWithScanQRCodeActivityResultLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val extras = Bundle()
-            extras.putParcelable(ConversationFragmentV2.ADDRESS,result.data!!.parcelable(ConversationFragmentV2.ADDRESS))
-            extras.putLong(ConversationFragmentV2.THREAD_ID, result.data!!.getLongExtra(ConversationFragmentV2.THREAD_ID,-1))
-            extras.putParcelable(ConversationFragmentV2.URI,result.data!!.parcelable(ConversationFragmentV2.URI))
-            extras.putString(ConversationFragmentV2.TYPE,result.data!!.getStringExtra(ConversationFragmentV2.TYPE))
-            showOrHideFragment(ConversationFragmentV2(), extras, result.data!!.getLongExtra(ConversationFragmentV2.THREAD_ID,-1))
-        }
-    }
-
-    private fun showPath() {
-        Intent(requireContext(), PathActivity::class.java).also {
-            show(it)
-        }
     }
 
     override fun showMessageRequests() {

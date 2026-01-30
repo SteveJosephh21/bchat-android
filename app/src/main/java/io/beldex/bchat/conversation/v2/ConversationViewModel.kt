@@ -134,11 +134,21 @@ class ConversationViewModel (
         }
     }
 
-    fun getDraft(): String? {
-        val draft: String? = repository.getDraft(threadId)
+    fun clearInputBarTextBox(status : Boolean) {
+        if(status) {
+            clearDraft()
+        }
+    }
+
+    private fun clearDraft() {
         viewModelScope.launch(Dispatchers.IO) {
             repository.clearDrafts(threadId)
         }
+    }
+
+    fun getDraft(): String? {
+        val draft: String? = repository.getDraft(threadId)
+        clearDraft()
         return draft
     }
 

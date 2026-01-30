@@ -63,6 +63,7 @@ import io.beldex.bchat.wallet.CheckOnline
 import dagger.hilt.android.AndroidEntryPoint
 import io.beldex.bchat.R
 import io.beldex.bchat.databinding.ActivityMyProfileBinding
+import io.beldex.bchat.util.Utils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -82,7 +83,6 @@ class MyProfileActivity: AppCompatActivity() {
     private lateinit var glide: RequestManager
     private var tempFile: File? = null
     private lateinit var binding: ActivityMyProfileBinding
-    private val namePattern = Pattern.compile("[A-Za-z0-9\\s]+")
     private val hexEncodedPublicKey: String
         get() {
             return TextSecurePreferences.getLocalNumber(this)!!
@@ -384,7 +384,7 @@ class MyProfileActivity: AppCompatActivity() {
             ).show()
             return false
         }
-        if (!displayName.matches(namePattern.toRegex())) {
+        if (!displayName.matches(Utils.namePattern.toRegex())) {
             Toast.makeText(
                 this,
                 R.string.display_name_validation,

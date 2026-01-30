@@ -24,6 +24,7 @@ import io.beldex.bchat.database.ThreadDatabase
 import io.beldex.bchat.dependencies.DatabaseComponent
 import com.bumptech.glide.Glide;
 import io.beldex.bchat.util.UiModeUtilities
+import io.beldex.bchat.util.Utils
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -145,20 +146,29 @@ class UserDetailsBottomSheet : BottomSheetDialogFragment() {
     }
 
     private fun saveNickName(recipient: Recipient) = with(binding) {
-        if (nicknameEditText.text.trim().isEmpty()) {
-            Toast.makeText(context,R.string.enter_a_valid_nickname,Toast.LENGTH_SHORT).show()
-        }else{
-            nicknameEditText.clearFocus()
-            hideSoftKeyboard()
-            nameTextViewContainer.visibility = View.VISIBLE
-            nameEditTextContainer.visibility = View.INVISIBLE
-            val publicKey = recipient.address.serialize()
-            val contactDB = DatabaseComponent.get(requireContext()).bchatContactDatabase()
-            val contact = contactDB.getContactWithBchatID(publicKey) ?: Contact(publicKey)
-            contact.nickname = nicknameEditText.text.toString()
-            contactDB.setContact(contact)
-            nameTextView.text = recipient.name ?: publicKey // Uses the Contact API internally
+        val nickName = nicknameEditText.text.toString().trim()
+        if (nickName.isEmpty()) {
+            Utils.showToast(context, R.string.enter_a_valid_nickname)
+            return
         }
+
+        if (!nickName.matches(Utils.namePattern.toRegex())) {
+            Utils.showToast(
+                context,
+                R.string.fragment_user_details_bottom_sheet_nick_name_invalid_start_char_error
+            )
+            return
+        }
+        nicknameEditText.clearFocus()
+        hideSoftKeyboard()
+        nameTextViewContainer.visibility = View.VISIBLE
+        nameEditTextContainer.visibility = View.INVISIBLE
+        val publicKey = recipient.address.serialize()
+        val contactDB = DatabaseComponent.get(requireContext()).bchatContactDatabase()
+        val contact = contactDB.getContactWithBchatID(publicKey) ?: Contact(publicKey)
+        contact.nickname = nicknameEditText.text.toString()
+        contactDB.setContact(contact)
+        nameTextView.text = recipient.name ?: publicKey // Uses the Contact API internally
     }
 
     @SuppressLint("ServiceCast")

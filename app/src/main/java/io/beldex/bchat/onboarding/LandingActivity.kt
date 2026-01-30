@@ -16,6 +16,10 @@ import android.widget.Button
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.beldex.libbchat.utilities.TextSecurePreferences
+import com.beldex.libsignal.crypto.MnemonicCodec
+import com.beldex.libsignal.utilities.Hex
+import com.beldex.libsignal.utilities.hexEncodedPrivateKey
+import io.beldex.bchat.BeldexAddress
 import io.beldex.bchat.crypto.IdentityKeyUtil
 import io.beldex.bchat.permissions.Permissions
 import io.beldex.bchat.service.KeyCachingService
@@ -24,9 +28,26 @@ import io.beldex.bchat.util.nodelistasync.DownloadNodeListFileAsyncTask
 import io.beldex.bchat.util.nodelistasync.NodeListConstants
 import io.beldex.bchat.util.push
 import io.beldex.bchat.R
+import io.beldex.bchat.crypto.KeyPairUtilities
+import io.beldex.bchat.crypto.MnemonicUtilities
 import io.beldex.bchat.databinding.ActivityLandingBinding
 
 class LandingActivity : AppCompatActivity() {
+    private val seed by lazy {
+        var hexEncodedSeed=
+            IdentityKeyUtil.retrieve(this, IdentityKeyUtil.BELDEX_SEED)
+        if (hexEncodedSeed == null) {
+            hexEncodedSeed=
+                IdentityKeyUtil.getIdentityKeyPair(this).hexEncodedPrivateKey // Legacy account
+        }
+        val loadFileContents : (String) -> String={ fileName ->
+            MnemonicUtilities.loadFileContents(this, fileName)
+        }
+        MnemonicCodec(loadFileContents).encode(
+            hexEncodedSeed!!,
+            MnemonicCodec.Language.Configuration.english
+        )
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -91,18 +112,38 @@ class LandingActivity : AppCompatActivity() {
     }
 
     private fun register() {
-        val intent = Intent(this, DisplayNameActivity::class.java)
+       /* val intent = Intent(this, DisplayNameActivity::class.java)
         push(intent)
-        finish()
+        finish()*/
+        val loadFileContents: (String) -> String = { fileName ->
+            MnemonicUtilities.loadFileContents(this, fileName)
+        }
+        val hexEncodedSeed = MnemonicCodec(loadFileContents).decode("poker listen both playful match cube hiding gnome mittens veered website aglow ouch fatal fetches dash liquid safety strained noodles jittery because waffle wield waffle")
+        val seedByteArray = Hex.fromStringCondensed(hexEncodedSeed)
+        val address = BeldexAddress.fromSeed(
+            seed = seedByteArray
+        )
+        val keyPairGenerationResult = KeyPairUtilities.generate(seedByteArray)
+        val seed = keyPairGenerationResult.seed
+        val ed25519KeyPair = keyPairGenerationResult.ed25519KeyPair
+        val x25519KeyPair = keyPairGenerationResult.x25519KeyPair
+        KeyPairUtilities.store(
+            this,
+            seed,
+            ed25519KeyPair,
+            x25519KeyPair
+        )
+        Log.d("Address -> ", "${address.address},\n ${address.view},\n ${address.spend}")
     }
 
     private fun restore() {
         /*val intent = Intent(this, RecoveryPhraseRestoreActivity::class.java)
         push(intent)*/
         //val intent = Intent(this, SeedOrKeysRestoreActivity::class.java)
-        val intent = Intent(this, RecoveryPhraseRestoreActivity::class.java)
+       /* val intent = Intent(this, RecoveryPhraseRestoreActivity::class.java)
         push(intent)
-        finish()
+        finish()*/
+        Log.d("Address Seed -> ", "${seed}")
     }
 
     private fun link() {

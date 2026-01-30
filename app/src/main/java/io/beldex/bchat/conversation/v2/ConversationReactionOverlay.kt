@@ -451,7 +451,7 @@ class ConversationReactionOverlay : FrameLayout {
     }
     private fun handleUpEvent() {
         val onReactionSelectedListener = onReactionSelectedListener
-        if (selected != -1 && onReactionSelectedListener != null && backgroundView.visibility == VISIBLE) {
+        if (selected != -1 && onReactionSelectedListener != null && backgroundView.isVisible) {
             if (selected == customEmojiIndex) {
                 onReactionSelectedListener.onCustomReactionSelected(messageRecord, emojiViews[selected].tag != null)
             } else {

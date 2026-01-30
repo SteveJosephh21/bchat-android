@@ -107,13 +107,4 @@ class HomeViewModel @Inject constructor(
         }
         return newSet
     }
-
-    fun setFavouriteNodes(nodes: MutableCollection<NodeInfo>?) {
-        val newNodes = hashSetOf<NodeInfo>()
-        nodes?.forEach { node ->
-            if (node.isFavourite) newNodes.add(node)
-        }
-        sharedPreferenceUtil.saveFavourites(newNodes)
-    }
-
 }

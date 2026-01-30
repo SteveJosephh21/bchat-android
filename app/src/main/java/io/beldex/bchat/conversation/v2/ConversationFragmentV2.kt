@@ -22,6 +22,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.provider.Settings
 import android.text.Editable
 import android.text.Html
 import android.text.Spannable
@@ -51,17 +52,22 @@ import androidx.annotation.ColorInt
 import androidx.annotation.DimenRes
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
-import io.beldex.bchat.util.drawToBitmap
+import androidx.core.graphics.drawable.toDrawable
+import androidx.core.os.bundleOf
+import androidx.core.view.isNotEmpty
 import androidx.core.view.isVisible
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.loader.app.LoaderManager
 import androidx.loader.content.Loader
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -186,6 +192,7 @@ import io.beldex.bchat.util.DateUtils
 import io.beldex.bchat.util.Helper
 import io.beldex.bchat.util.MediaUtil
 import io.beldex.bchat.util.SaveAttachmentTask
+import io.beldex.bchat.util.drawToBitmap
 import io.beldex.bchat.util.getColorWithID
 import io.beldex.bchat.util.isValidString
 import io.beldex.bchat.util.parcelable
@@ -217,7 +224,6 @@ import org.apache.commons.lang3.time.DurationFormatUtils
 import org.json.JSONException
 import org.json.JSONObject
 import timber.log.Timber
-import java.lang.System
 import java.text.DecimalFormat
 import java.text.NumberFormat
 import java.util.Locale
@@ -231,9 +237,6 @@ import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
-import androidx.core.graphics.drawable.toDrawable
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.repeatOnLifecycle
 
 
 private const val ARG_PARAM1="param1"
@@ -784,10 +787,10 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
 
             if (TextSecurePreferences.isPayAsYouChat(requireActivity())) {
                 if (binding.inputBar.text.isNotEmpty() && binding.inputBar.text.matches(Regex("^(([0-9]{0,9})?|[.][0-9]{0,5})?|([0-9]{0,9}+([.][0-9]{0,5}))\$"))) {
-                    binding.inputBar.setTextColor(thread, HomeActivity.reportIssueBChatID, true)
+                    binding.inputBar.setTextColor(thread, HomeActivity.REPORT_ISSUE_BCHAT_ID, true)
                     showPayWithSlide(thread, true)
                 } else {
-                    binding.inputBar.setTextColor(thread, HomeActivity.reportIssueBChatID, false)
+                    binding.inputBar.setTextColor(thread, HomeActivity.REPORT_ISSUE_BCHAT_ID, false)
                     showPayWithSlide(thread, false)
                 }
                 if (syncText == getString(R.string.failed_to_connect_to_node) || syncText == getString(
@@ -799,7 +802,7 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
                     binding.inputBar.showDrawableProgressBar(false, valueOfWallet)
                 }
             } else {
-                binding.inputBar.setTextColor(thread, HomeActivity.reportIssueBChatID, false)
+                binding.inputBar.setTextColor(thread, HomeActivity.REPORT_ISSUE_BCHAT_ID, false)
                 showPayWithSlide(thread, false)
             }
         }
@@ -864,40 +867,86 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
         }
     }
 
+    private val storagePermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+            val allGranted = result.values.all { it }
+
+            if (allGranted) {
+                return@registerForActivityResult
+            }
+
+            val permanentlyDenied = result.any { (permission, granted) ->
+                !granted && !shouldShowRequestPermissionRationale(permission)
+            }
+
+            when {
+                permanentlyDenied -> {
+                    showOpenSettingsDialog()
+                }
+                else -> {
+                    showStoragePermissionRationaleDialog()
+                }
+            }
+        }
+
     private fun checkReadExternalStoragePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(
-                    requireContext(), Manifest.permission.READ_MEDIA_IMAGES
+            val permissions = arrayOf(
+                Manifest.permission.READ_MEDIA_IMAGES,
+                Manifest.permission.READ_MEDIA_VIDEO
+            )
+
+            val notGranted = permissions.any { permission ->
+                ContextCompat.checkSelfPermission(
+                    requireContext(),
+                    permission
                 ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                requestReadExternalStoragePermissionForTiramisu()
+            }
+
+            if (notGranted) {
+                storagePermissionLauncher.launch(permissions)
             }
         } else {
             if (ContextCompat.checkSelfPermission(
-                    requireContext(), Manifest.permission.READ_EXTERNAL_STORAGE
+                    requireContext(),
+                    Manifest.permission.READ_EXTERNAL_STORAGE
                 ) != PackageManager.PERMISSION_GRANTED
             ) {
-                requestReadExternalStoragePermission()
+                storagePermissionLauncher.launch(
+                    arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+                )
             }
         }
     }
 
-    private fun requestReadExternalStoragePermission() {
-        ActivityCompat.requestPermissions(
-            requireActivity(),
-            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
-            PICK_FROM_LIBRARY
+    private fun showStoragePermissionRationaleDialog() {
+        val permissionDialog = ComposeDialogContainer(
+            dialogType = DialogType.PermissionDialog,
+            onConfirm = {
+                checkReadExternalStoragePermission()
+            },
+            onCancel = {}
         )
+        permissionDialog.arguments = bundleOf(ComposeDialogContainer.EXTRA_ARGUMENT_1 to String.format(getString(R.string.ConversationActivity_to_send_photos_and_video_allow_signal_access_to_storage)))
+        permissionDialog.show(requireActivity().supportFragmentManager, ComposeDialogContainer.TAG)
     }
 
-    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-    private fun requestReadExternalStoragePermissionForTiramisu() {
-        ActivityCompat.requestPermissions(
-            requireActivity(), arrayOf(
-                Manifest.permission.READ_MEDIA_IMAGES,
-                Manifest.permission.READ_MEDIA_VIDEO
-            ), PICK_FROM_LIBRARY
+    private fun showOpenSettingsDialog() {
+        val permissionDialog = ComposeDialogContainer(
+            dialogType = DialogType.PermissionDialog,
+            onConfirm = {
+                openAppSettings()
+            },
+            onCancel = {}
         )
+        permissionDialog.arguments = bundleOf(ComposeDialogContainer.EXTRA_ARGUMENT_1 to String.format(getString(R.string.AttachmentManager_signal_requires_the_external_storage_permission_in_order_to_attach_photos_videos_or_audio)))
+        permissionDialog.show(requireActivity().supportFragmentManager, ComposeDialogContainer.TAG)
+    }
+
+    private fun openAppSettings() {
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", requireContext().packageName, null)
+        }.let(::startActivity)
     }
 
     private fun setupCallActionBar() {
@@ -972,7 +1021,7 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
     }
 
     private fun showPayWithSlide(thread : Recipient?, status : Boolean) {
-        if (thread != null && !thread.isGroupRecipient && thread.hasApprovedMe() && !thread.isBlocked && thread.isApproved && HomeActivity.reportIssueBChatID != thread.address.toString() && !thread.isLocalNumber && status) {
+        if (thread != null && !thread.isGroupRecipient && thread.hasApprovedMe() && !thread.isBlocked && thread.isApproved && HomeActivity.REPORT_ISSUE_BCHAT_ID != thread.address.toString() && !thread.isLocalNumber && status) {
             binding.slideToPayButton.visibility=View.VISIBLE
             selectedEvent?.let { dispatchTouchEvents(it) }
         } else {
@@ -982,7 +1031,7 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
 
     private fun callShowPayAsYouChatBDXIcon(thread : Recipient?) {
         if (thread != null) {
-            binding.inputBar.showPayAsYouChatBDXIcon(thread, HomeActivity.reportIssueBChatID)
+            binding.inputBar.showPayAsYouChatBDXIcon(thread, HomeActivity.REPORT_ISSUE_BCHAT_ID)
         }
     }
 
@@ -992,7 +1041,7 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
                 blockProgressBarVisible=
                     if (!thread.isGroupRecipient && thread.hasApprovedMe() && !thread.isBlocked && TextSecurePreferences.isPayAsYouChat(
                             requireActivity()
-                        ) && thread.isApproved && HomeActivity.reportIssueBChatID != thread.address.toString() && !thread.isLocalNumber
+                        ) && thread.isApproved && HomeActivity.REPORT_ISSUE_BCHAT_ID != thread.address.toString() && !thread.isLocalNumber
                     ) {
                         binding.inputBar.showProgressBar(true)
                         true
@@ -1451,6 +1500,7 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
 
             override fun onSuccess(result : Boolean?) {
                 if (result == true) {
+                    viewModel.clearInputBarTextBox(binding.inputBar.isNotEmpty())
                     sendAttachments(attachmentManager.buildSlideDeck().asAttachments(), null)
                 }
             }
@@ -1538,6 +1588,7 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
                         }
                     }
                 }
+                viewModel.clearInputBarTextBox(binding.inputBar.isNotEmpty())
                 sendAttachments(slideDeck.asAttachments(), body)
             }
 
@@ -1554,6 +1605,7 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
                 val recipients=selectedContacts.map { contact ->
                     Recipient.from(requireActivity(), Address.fromSerialized(contact), true)
                 }
+                viewModel.clearInputBarTextBox(binding.inputBar.isNotEmpty())
                 viewModel.inviteContacts(recipients)
             }
         }
@@ -2357,11 +2409,13 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
                     val addressForThread=Address.fromSerialized(address[0])
                     val recipient=Recipient.from(requireContext(), addressForThread, true)
                     val threadId=viewModel.getOrCreateThreadIdForContact(recipient)
-                    val extras=Bundle()
-                    extras.putLong(THREAD_ID, threadId)
-                    val manager=requireActivity().supportFragmentManager
-                    manager.popBackStack()
-                    showOrHideFragment(ConversationFragmentV2(), extras, threadId)
+                    if(viewModel.threadId != threadId) {
+                        val extras = Bundle()
+                        extras.putLong(THREAD_ID, threadId)
+                        val manager = requireActivity().supportFragmentManager
+                        manager.popBackStack()
+                        showOrHideFragment(ConversationFragmentV2(), extras, threadId)
+                    }
                 },
                 onCancel={}
             )
@@ -2463,24 +2517,26 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
     // region Animation & Updating
     override fun onModified(recipient : Recipient) {
         this.activity?.runOnUiThread {
-            val threadRecipient=viewModel.recipient.value ?: return@runOnUiThread
-            if (threadRecipient.isContactRecipient) {
-                binding.blockedBanner.isVisible=threadRecipient.isBlocked
-                setConversationRecyclerViewLayout(threadRecipient)
-                callShowPayAsYouChatBDXIcon(threadRecipient)
-                showBlockProgressBar(threadRecipient)
+            if (recipient.isContactRecipient) {
+                binding.blockedBanner.isVisible=recipient.isBlocked
+                setConversationRecyclerViewLayout(recipient)
+                callShowPayAsYouChatBDXIcon(recipient)
+                showBlockProgressBar(recipient)
             }
-            //New Line v32
             setUpMessageRequestsBar()
-            this.activity?.invalidateOptionsMenu()
+            activity?.invalidateOptionsMenu()
             updateSubtitle()
             showOrHideInputIfNeeded()
             binding.profilePictureView.root.recycle()
-            binding.profilePictureView.root.update(threadRecipient)
-            //New Line v32
-            binding.conversationTitleView.text=when {
-                threadRecipient.isLocalNumber -> getString(R.string.note_to_self).capitalizeFirstLetter()
-                else -> threadRecipient.toShortString().capitalizeFirstLetter()
+            binding.profilePictureView.root.update(recipient)
+
+            binding.conversationTitleView.text = when {
+                recipient.isLocalNumber ->
+                    getString(R.string.note_to_self)
+                        .replaceFirstChar { it.titlecase(Locale.getDefault()) }
+                else ->
+                    recipient.toShortString()
+                        .replaceFirstChar { it.titlecase(Locale.getDefault()) }
             }
         }
     }
@@ -2655,6 +2711,7 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
             if (result.resultCode == Activity.RESULT_OK) {
                 val contactsList=
                     result.data?.serializable<ArrayList<ContactModel>>(ContactSharingActivity.RESULT_CONTACT_TO_SHARE)
+                viewModel.clearInputBarTextBox(binding.inputBar.isNotEmpty())
                 if (binding.inputBar.quote != null) {
                     sendAttachments(
                         listOf(),
@@ -2665,7 +2722,6 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
                     )
                 } else {
                     binding.conversationRecyclerView.scrollToPosition(0)
-
                     shareContact(contactsList?.toList() ?: listOf())
                 }
             }
@@ -2800,7 +2856,7 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
 
     private fun setMediaControlForReportIssue() {
         val recipient=viewModel.recipient.value ?: return
-        if (recipient.address.toString() == HomeActivity.reportIssueBChatID) {
+        if (recipient.address.toString() == HomeActivity.REPORT_ISSUE_BCHAT_ID) {
             binding.inputBar.showMediaControls=true
         }
     }
@@ -2851,10 +2907,10 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
     private fun checkInputBarTextOnTextChanged(text : String?, thread : Recipient) {
         if (TextSecurePreferences.isPayAsYouChat(requireActivity())) {
             if (text!!.isNotEmpty() && text.matches(Regex("^(([0-9]{0,9})?|[.][0-9]{0,5})?|([0-9]{0,9}+([.][0-9]{0,5}))\$")) && binding.inputBar.quote == null) {
-                binding.inputBar.setTextColor(thread, HomeActivity.reportIssueBChatID, true)
+                binding.inputBar.setTextColor(thread, HomeActivity.REPORT_ISSUE_BCHAT_ID, true)
                 showPayWithSlide(thread, true)
             } else {
-                binding.inputBar.setTextColor(thread, HomeActivity.reportIssueBChatID, false)
+                binding.inputBar.setTextColor(thread, HomeActivity.REPORT_ISSUE_BCHAT_ID, false)
                 showPayWithSlide(thread, false)
             }
         }
@@ -3181,7 +3237,7 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
     /*Hales63*/
     private fun setUpMessageRequestsBar() {
         val recipient=viewModel.recipient.value ?: return
-        if (recipient.address.toString() != HomeActivity.reportIssueBChatID) {
+        if (recipient.address.toString() != HomeActivity.REPORT_ISSUE_BCHAT_ID) {
             binding.inputBar.showMediaControls=!isOutgoingMessageRequestThread()
         }
         binding.messageRequestBar.isVisible=isIncomingMessageRequestThread()
@@ -3487,6 +3543,16 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
             recipient,
             message.sentTimestamp
         )
+
+        // Clear the input bar
+        binding.inputBar.text=""
+
+        binding.inputBar.cancelQuoteDraft(2)
+        binding.inputBar.cancelLinkPreviewDraft(2)
+        // Clear mentions
+        previousText=""
+        currentMentionStartIndex=-1
+        mentions.clear()
 
         // Put the message in the database
         message.id = viewModel.insertMessageOutBoxSMS(outgoingTextMessage, message.sentTimestamp)
@@ -4080,7 +4146,7 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
 
     fun onRefreshed(wallet : Wallet, full : Boolean) {
         val recipient=viewModel.recipient.value ?: return
-        if (!recipient.isGroupRecipient && recipient.hasApprovedMe() && !recipient.isBlocked && HomeActivity.reportIssueBChatID != recipient.address.toString() && !recipient.isLocalNumber) {
+        if (!recipient.isGroupRecipient && recipient.hasApprovedMe() && !recipient.isBlocked && HomeActivity.REPORT_ISSUE_BCHAT_ID != recipient.address.toString() && !recipient.isLocalNumber) {
             if (full && listenerCallback!!.isSynced) {
                 if (CheckOnline.isOnline(requireContext())) {
                     check(listenerCallback!!.hasBoundService()) { "WalletService not bound." }
@@ -4256,7 +4322,7 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
         override fun doInBackground(vararg params : Executor?) : Boolean {
             try {
                 viewModel.recipient.value?.let { thread ->
-                    if (!thread.isGroupRecipient && thread.hasApprovedMe() && !thread.isBlocked && HomeActivity.reportIssueBChatID != thread.address.toString() && !thread.isLocalNumber && TextSecurePreferences.isWalletActive(
+                    if (!thread.isGroupRecipient && thread.hasApprovedMe() && !thread.isBlocked && HomeActivity.REPORT_ISSUE_BCHAT_ID != thread.address.toString() && !thread.isLocalNumber && TextSecurePreferences.isWalletActive(
                             requireContext()
                         )
                     ) {

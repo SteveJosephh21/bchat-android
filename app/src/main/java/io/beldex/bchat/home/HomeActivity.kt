@@ -1,6 +1,5 @@
 package io.beldex.bchat.home
 
-import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.ComponentName
@@ -11,10 +10,7 @@ import android.content.ServiceConnection
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Color
-import android.graphics.PointF
-import android.graphics.drawable.ColorDrawable
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
@@ -22,7 +18,6 @@ import android.os.Looper
 import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.MotionEvent
-import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -31,16 +26,10 @@ import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
 import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.FragmentManager
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import com.beldex.libbchat.messaging.MessagingModuleConfiguration
 import com.beldex.libbchat.messaging.jobs.JobQueue
-import com.beldex.libbchat.messaging.messages.visible.Reaction
-import com.beldex.libbchat.messaging.messages.visible.VisibleMessage
-import com.beldex.libbchat.messaging.open_groups.OpenGroupAPIV2
-import com.beldex.libbchat.messaging.sending_receiving.MessageSender
 import com.beldex.libbchat.mnode.MnodeAPI
 import com.beldex.libbchat.utilities.Address
 import com.beldex.libbchat.utilities.ProfilePictureModifiedEvent
@@ -73,7 +62,6 @@ import io.beldex.bchat.conversation.v2.ConversationReactionDelegate
 import io.beldex.bchat.conversation.v2.ConversationReactionOverlay
 import io.beldex.bchat.conversation.v2.ConversationViewModel
 import io.beldex.bchat.conversation.v2.ViewUtil
-import io.beldex.bchat.conversation.v2.contact_sharing.ViewAllContactFragment
 import io.beldex.bchat.conversation.v2.utilities.BaseDialog
 import io.beldex.bchat.data.BarcodeData
 import io.beldex.bchat.data.NodeInfo
@@ -88,13 +76,11 @@ import io.beldex.bchat.database.SmsDatabase
 import io.beldex.bchat.database.ThreadDatabase
 import io.beldex.bchat.database.model.MessageId
 import io.beldex.bchat.database.model.MessageRecord
-import io.beldex.bchat.database.model.ReactionRecord
 import io.beldex.bchat.databinding.ActivityHomeBinding
 import io.beldex.bchat.dependencies.DatabaseComponent
 import io.beldex.bchat.groups.OpenGroupManager
 import io.beldex.bchat.home.search.GlobalSearchAdapter
 import io.beldex.bchat.home.search.GlobalSearchViewModel
-import io.beldex.bchat.mediapreview.MediaPreviewViewModel
 import io.beldex.bchat.model.AsyncTaskCoroutine
 import io.beldex.bchat.model.NetworkType
 import io.beldex.bchat.model.PendingTransaction
@@ -122,7 +108,6 @@ import io.beldex.bchat.wallet.WalletFragment
 import io.beldex.bchat.wallet.info.WalletInfoActivity
 import io.beldex.bchat.wallet.jetpackcomposeUI.settings.WalletSettingComposeActivity
 import io.beldex.bchat.wallet.jetpackcomposeUI.settings.WalletSettingScreens
-import io.beldex.bchat.wallet.node.NodeFragment
 import io.beldex.bchat.wallet.receive.ReceiveFragment
 import io.beldex.bchat.wallet.rescan.RescanDialog
 import io.beldex.bchat.wallet.scanner.ScannerFragment
@@ -143,18 +128,21 @@ import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
 import timber.log.Timber
-import java.io.File
 import java.util.Collections
 import java.util.Random
 import javax.inject.Inject
 import io.beldex.bchat.notifications.PushRegistry
-import io.beldex.bchat.permissions.Permissions
+import androidx.core.graphics.drawable.toDrawable
+import androidx.core.content.edit
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import com.google.android.play.core.appupdate.AppUpdateOptions
 
 
 @AndroidEntryPoint
 class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDelegate,HomeFragment.HomeFragmentListener,ConversationFragmentV2.Listener,UserDetailsBottomSheet.UserDetailsBottomSheetListener, ActivityDispatcher,
     WalletFragment.Listener, WalletService.Observer, WalletScannerFragment.OnScannedListener,SendFragment.OnScanListener,SendFragment.Listener,ReceiveFragment.Listener,WalletFragment.OnScanListener,
-    ScannerFragment.OnWalletScannedListener,WalletScannerFragment.Listener,NodeFragment.Listener,ReactWithAnyEmojiDialogFragment.Callback,ConversationReactionOverlay.OnReactionSelectedListener,
+    ScannerFragment.OnWalletScannedListener,WalletScannerFragment.Listener,ReactWithAnyEmojiDialogFragment.Callback,ConversationReactionOverlay.OnReactionSelectedListener,
     ReactionsDialogFragment.Callback {
 
     private lateinit var binding: ActivityHomeBinding
@@ -178,7 +166,9 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
         const val SHORTCUT_LAUNCHER = "short_cut_launcher"
 
         var REQUEST_URI = "uri"
-        const val reportIssueBChatID = BuildConfig.REPORT_ISSUE_ID
+        const val REPORT_ISSUE_BCHAT_ID = BuildConfig.REPORT_ISSUE_ID
+        const val PING_SELECTED = 0
+        const val FIND_BEST = 1
     }
 
     //Wallet
@@ -200,8 +190,6 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
     private val isLightWallet:  Boolean = false
 
     private val viewModel: HomeViewModel by viewModels()
-    private val conversationViewModel: ConversationViewModel by viewModels()
-    /*private var conversationViewModel : ConversationViewModel?=null*/
 
     @Inject
     lateinit var sharedPreferenceUtil: SharedPreferenceUtil
@@ -254,25 +242,9 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
             extras.putString(ConversationFragmentV2.TYPE,intent.getStringExtra(ConversationFragmentV2.TYPE))
             extras.putCharSequence(Intent.EXTRA_TEXT,intent.getCharSequenceExtra(Intent.EXTRA_TEXT))
 
-            val oldFragment = supportFragmentManager.findFragmentById(R.id.activity_home_frame_layout_container)
-            if (oldFragment != null) {
-                supportFragmentManager.beginTransaction().remove(oldFragment).commit()
-            }
-            val homeFragment: Fragment = HomeFragment()
-            homeFragment.arguments = extras
-            supportFragmentManager
-                .beginTransaction()
-                .replace(R.id.activity_home_frame_layout_container,homeFragment)
-                .commit()
+            replaceHomeFragment(HomeFragment(), extras)
         }else {
-            val oldFragment = supportFragmentManager.findFragmentById(R.id.activity_home_frame_layout_container)
-            if (oldFragment != null) {
-                supportFragmentManager.beginTransaction().remove(oldFragment).commit()
-            }
-            supportFragmentManager
-                .beginTransaction()
-                .replace(R.id.activity_home_frame_layout_container, HomeFragment())
-                .commit()
+           replaceHomeFragment(HomeFragment(), null)
         }
 
         IP2Country.configureIfNeeded(this@HomeActivity)
@@ -375,12 +347,11 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
             val currentFragment = getCurrentFragment()
             if(currentFragment is HomeFragment) {
                 currentFragment.homeViewModel.tryUpdateChannel()
-                currentFragment.updateAdapter()
+                currentFragment.updateHomeAdapter()
             }
         }
     }
 
-    //New Line
     /*private fun launchSuccessLottieDialog() {
         val button = Button(this)
         button.text = "Claim BDX"
@@ -411,7 +382,7 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
             Toast.makeText(this, "Can't open URL", Toast.LENGTH_LONG).show()
         }
     }*/
-    //New Line App Update
+    //App Update
     private fun checkUpdate() {
         val appUpdateInfoTask: Task<AppUpdateInfo> = appUpdateManager!!.appUpdateInfo
         appUpdateInfoTask.addOnSuccessListener { appUpdateInfo ->
@@ -441,27 +412,27 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        //New Line App Update
+        //App Update
         if (requestCode == immediateAppUpdateRequestCode) {
             when (resultCode) {
                 RESULT_CANCELED -> {
                     Toast.makeText(
                         applicationContext,
-                        "Update canceled by user! Result Code: $resultCode", Toast.LENGTH_LONG
+                        "Update canceled by user!", Toast.LENGTH_LONG
                     ).show()
                     finish()
                 }
                 RESULT_OK -> {
                     Toast.makeText(
                         applicationContext,
-                        "Update success! Result Code: $resultCode",
+                        "Update success!",
                         Toast.LENGTH_LONG
                     ).show()
                 }
                 else -> {
                     Toast.makeText(
                         applicationContext,
-                        "Update Failed! Result Code: $resultCode",
+                        "Update Failed!",
                         Toast.LENGTH_LONG
                     ).show()
                     checkUpdate()
@@ -484,101 +455,132 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
         drawerProfileName: TextView,
         drawerProfileIcon: ProfilePictureView
     ) {
-        lifecycleScope.launchWhenStarted {
-            launch(Dispatchers.IO) {
-                // Double check that the long poller is up
-                (applicationContext as ApplicationContext).startPollingIfNeeded()
-                // update things based on TextSecurePrefs (profile info etc)
-                // Set up remaining components if needed
-                pushRegistry.refresh(false)
-                val userPublicKey = TextSecurePreferences.getLocalNumber(this@HomeActivity)
-                if (userPublicKey != null) {
-                    OpenGroupManager.startPolling()
-                    JobQueue.shared.resumePendingJobs()
-                }
-                // Set up typing observer
-                withContext(Dispatchers.Main) {
-                    updateProfileButton(profileButton,drawerProfileName,drawerProfileIcon,publicKey)
-                    TextSecurePreferences.events.filter { it == TextSecurePreferences.PROFILE_NAME_PREF }.collect {
-                        updateProfileButton(profileButton,drawerProfileName,drawerProfileIcon,publicKey)
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    withContext(Dispatchers.IO) {
+                        // Double check that the long poller is up
+                        (applicationContext as ApplicationContext).startPollingIfNeeded()
+                        // update things based on TextSecurePrefs (profile info etc)
+                        // Set up remaining components if needed
+                        pushRegistry.refresh(false)
+                        val userPublicKey = TextSecurePreferences.getLocalNumber(this@HomeActivity)
+                        if (userPublicKey != null) {
+                            OpenGroupManager.startPolling()
+                            JobQueue.shared.resumePendingJobs()
+                        }
                     }
                 }
-            }
-            // monitor the global search VM query
-//            launch {
-//                globalSearchInputLayout.query
-//                    .onEach(globalSearchViewModel::postQuery)
-//                    .collect()
-//            }
-            // Get group results and display them
-            launch {
-                globalSearchViewModel.result.collect { result ->
-                    val contactAndGroupList =
-                        result.contacts.map { GlobalSearchAdapter.Model.Contact(it) } +
-                                result.threads.map { GlobalSearchAdapter.Model.GroupConversation(it) }
-
-                    val contactResults = contactAndGroupList.toMutableList()
-
-                    if (contactResults.isEmpty()) {
-                        contactResults.add(
-                            GlobalSearchAdapter.Model.SavedMessages(
+                launch {
+                    updateProfileButton(
+                        profileButton,
+                        drawerProfileName,
+                        drawerProfileIcon,
+                        publicKey
+                    )
+                    TextSecurePreferences.events.filter { it == TextSecurePreferences.PROFILE_NAME_PREF }
+                        .collect {
+                            updateProfileButton(
+                                profileButton,
+                                drawerProfileName,
+                                drawerProfileIcon,
                                 publicKey
                             )
-                        )
-                    }
+                        }
+                }
+                // monitor the global search VM query
+//              launch {
+//                  globalSearchInputLayout.query
+//                      .onEach(globalSearchViewModel::postQuery)
+//                      .collect()
+//              }
+                // Get group results and display them
+                launch {
+                    globalSearchViewModel.result.collect { result ->
+                        val contacts = result.contacts.map {
+                            GlobalSearchAdapter.Model.Contact(it)
+                        }
 
-                    val userIndex =
-                        contactResults.indexOfFirst { it is GlobalSearchAdapter.Model.Contact && it.contact.bchatID == publicKey }
-                    if (userIndex >= 0) {
-                        contactResults[userIndex] =
-                            GlobalSearchAdapter.Model.SavedMessages(publicKey)
-                    }
+                        val groups = result.threads.map {
+                            GlobalSearchAdapter.Model.GroupConversation(it)
+                        }
+                        val contactResults = (contacts + groups).toMutableList()
 
-                    if (contactResults.isNotEmpty()) {
-                        contactResults.add(
-                            0,
-                            GlobalSearchAdapter.Model.Header(R.string.global_search_contacts_groups)
-                        )
-                    }
-
-                    val unreadThreadMap = result.messages
-                        .groupBy { it.threadId }.keys.associateWith {
-                            mmsSmsDatabase.getUnreadCount(
-                                it
+                        if (contactResults.isEmpty()) {
+                            contactResults.add(
+                                GlobalSearchAdapter.Model.SavedMessages(
+                                    publicKey
+                                )
                             )
                         }
 
-                    val messageResults: MutableList<GlobalSearchAdapter.Model> = result.messages
-                        .map { messageResult ->
-                            GlobalSearchAdapter.Model.Message(
-                                messageResult,
-                                unreadThreadMap[messageResult.threadId] ?: 0
+                        val userIndex =
+                            contactResults.indexOfFirst { it is GlobalSearchAdapter.Model.Contact && it.contact.bchatID == publicKey }
+                        if (userIndex >= 0) {
+                            contactResults[userIndex] =
+                                GlobalSearchAdapter.Model.SavedMessages(publicKey)
+                        }
+
+                        if (contactResults.isNotEmpty()) {
+                            contactResults.add(
+                                0,
+                                GlobalSearchAdapter.Model.Header(R.string.global_search_contacts_groups)
                             )
-                        }.toMutableList()
+                        }
 
-                    if (messageResults.isNotEmpty()) {
-                        messageResults.add(
-                            0,
-                            GlobalSearchAdapter.Model.Header(R.string.global_search_messages)
-                        )
+                        val unreadThreadMap = result.messages
+                            .groupBy { it.threadId }.keys.associateWith {
+                                mmsSmsDatabase.getUnreadCount(
+                                    it
+                                )
+                            }
+
+                        val messageResults: MutableList<GlobalSearchAdapter.Model> = result.messages
+                            .map {
+                                GlobalSearchAdapter.Model.Message(
+                                    it,
+                                    unreadThreadMap[it.threadId] ?: 0
+                                )
+                            }.toMutableList()
+
+                        if (messageResults.isNotEmpty()) {
+                            messageResults.add(
+                                0,
+                                GlobalSearchAdapter.Model.Header(R.string.global_search_messages)
+                            )
+                        }
+
+                        val newData = contactResults + messageResults
+                        globalSearchAdapter.setNewData(result.query, newData)
                     }
-
-                    val newData = contactResults + messageResults
-                    globalSearchAdapter.setNewData(result.query, newData)
                 }
             }
         }
+    }
+
+    private fun replaceHomeFragment(homeFragment: Fragment, extras: Bundle?) {
+        if(extras != null) {
+            homeFragment.arguments = extras
+        }
+        val oldFragment = supportFragmentManager.findFragmentById(R.id.activity_home_frame_layout_container)
+        if (oldFragment != null) {
+            supportFragmentManager.beginTransaction().apply {
+                remove(oldFragment)
+            }.commit()
+        }
+        supportFragmentManager.beginTransaction().apply {
+            replace(R.id.activity_home_frame_layout_container,homeFragment)
+        }.commit()
     }
 
     fun replaceFragment(newFragment: Fragment, stackName: String?, extras: Bundle?) {
         if (extras != null) {
             newFragment.arguments = extras
         }
-        supportFragmentManager
-            .beginTransaction()
-            .replace(R.id.activity_home_frame_layout_container, newFragment)
-            .addToBackStack(stackName)
-            .commit()
+        supportFragmentManager.beginTransaction().apply {
+            replace(R.id.activity_home_frame_layout_container, newFragment)
+            addToBackStack(stackName)
+        }.commit()
     }
 
     fun showOrHideFragment(homeFragment: Fragment, extras: Bundle?, threadId: Long) {
@@ -610,14 +612,29 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
         }.commit()
     }
 
-    private fun replaceFragmentWithTransition(newFragment: Fragment, stackName: String?, extras: Bundle?) {
-        if (extras != null) {
-            newFragment.arguments = extras
+    private fun replaceFragmentWithTransition(newFragment: Fragment, tag: String) {
+        val transaction = supportFragmentManager.beginTransaction().apply {
+            setReorderingAllowed(true)
+            setCustomAnimations(
+                android.R.anim.fade_in,
+                android.R.anim.fade_out,
+                android.R.anim.fade_in,
+                android.R.anim.fade_out
+            )
         }
-        supportFragmentManager.beginTransaction()
-            .add(R.id.activity_home_frame_layout_container, newFragment)
-            .addToBackStack(stackName)
-            .commit()
+
+        supportFragmentManager.findFragmentById(R.id.activity_home_frame_layout_container)?.let {
+            transaction.hide(it)
+        }
+
+        val existingFragment = supportFragmentManager.findFragmentByTag(tag)
+        if (existingFragment != null) {
+            transaction.show(existingFragment)
+        } else {
+            transaction.add(R.id.activity_home_frame_layout_container, newFragment, tag)
+            transaction.addToBackStack(tag)
+        }
+        transaction.commit()
     }
 
     private fun updateProfileButton(
@@ -626,27 +643,24 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
         drawerProfileIcon: ProfilePictureView,
         publicKey: String
     ) {
+        val profileName = TextSecurePreferences.getProfileName(this)
         profileButton.publicKey = publicKey
-        profileButton.displayName = TextSecurePreferences.getProfileName(this)
+        profileButton.displayName = profileName
         profileButton.recycle()
-        profileButton.update(TextSecurePreferences.getProfileName(this))
+        profileButton.update(profileName)
 
         //New Line
-        drawerProfileName.text = TextSecurePreferences.getProfileName(this)
+        drawerProfileName.text = profileName
         drawerProfileIcon.publicKey = publicKey
-        drawerProfileIcon.displayName = TextSecurePreferences.getProfileName(this)
+        drawerProfileIcon.displayName = profileName
         drawerProfileIcon.recycle()
-        drawerProfileIcon.update(TextSecurePreferences.getProfileName(this))
+        drawerProfileIcon.update(profileName)
     }
 
     //Important
     override fun dispatchTouchEvent(event: MotionEvent?): Boolean {
         if (event?.action == MotionEvent.ACTION_DOWN) {
-            val touch = PointF(event.x, event.y)
             when (val currentFragment: Fragment? = getCurrentFragment()) {
-                is HomeFragment -> {
-                    currentFragment.dispatchTouchEvent()
-                }
                 is ConversationFragmentV2 -> {
                     currentFragment.dispatchTouchEvents(event)
                 }
@@ -664,38 +678,48 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        val fragment: Fragment? = getCurrentFragment()
-        if (fragment is ConversationFragmentV2 || fragment is SendFragment || fragment is ReceiveFragment || fragment is ScannerFragment || fragment is WalletScannerFragment || fragment is WalletFragment || fragment is ViewAllContactFragment) {
-            if (!(fragment as OnBackPressedListener).onBackPressed()) {
-                TextSecurePreferences.callFiatCurrencyApi(this,false)
-                try {
-                    if (fragment is ConversationFragmentV2) {
-                        if (!fragment.transactionInProgress) {
-                            onBackPressedDispatcher.onBackPressed()
+        val fragment = getCurrentFragment() ?: run {
+            onBackPressedDispatcher.onBackPressed()
+            return
+        }
+        when (fragment) {
+            is OnBackPressedListener -> {
+                if (!fragment.onBackPressed()) {
+                    TextSecurePreferences.callFiatCurrencyApi(this, false)
+
+                    try {
+                        when (fragment) {
+                            is ConversationFragmentV2 -> {
+                                if (!fragment.transactionInProgress) {
+                                    onBackPressedDispatcher.onBackPressed()
+                                }
+                                fragment.reactionDelegateDismiss()
+                                if (getIsReactionOverlayVisible(this)) {
+                                    setIsReactionOverlayVisible(this, false)
+                                }
+                            }
+                            else -> {
+                                onBackPressedDispatcher.onBackPressed()
+                            }
                         }
-                        fragment.reactionDelegateDismiss()
-                        if(getIsReactionOverlayVisible(this)){
-                            setIsReactionOverlayVisible(this,false)
-                        }
-                    } else {
-                        onBackPressedDispatcher.onBackPressed()
+                    } catch (e: IllegalStateException) {
+                        replaceHomeFragment()
                     }
-                }catch(e : IllegalStateException){
-                    replaceHomeFragment()
                 }
             }
-        }else if(fragment is HomeFragment){
-            backToHome(fragment)
+            is HomeFragment -> backToHome()
+            else -> onBackPressedDispatcher.onBackPressed() // Default behavior
         }
     }
 
     private fun replaceHomeFragment(){
         val homeFragment: Fragment = HomeFragment()
-        supportFragmentManager.beginTransaction()
-            .replace(R.id.activity_home_frame_layout_container, homeFragment, HomeFragment::class.java.name).commit()
+        supportFragmentManager.beginTransaction().apply {
+            replace(R.id.activity_home_frame_layout_container, homeFragment, HomeFragment::class.java.name)
+        }.commit()
     }
 
-    private fun backToHome(fragment: HomeFragment?) {
+    private fun backToHome() {
         when {
             !synced && TextSecurePreferences.isWalletActive(this) -> {
                 val walletSyncDialog = ComposeDialogContainer(
@@ -705,7 +729,6 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
                             onDisposeRequest()
                         }
                         setBarcodeData(null)
-                        fragment!!.onBackPressed()
                         finish()
                     },
                     onCancel = {}
@@ -717,7 +740,6 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
                     onDisposeRequest()
                 }
                 setBarcodeData(null)
-                fragment!!.onBackPressed()
                 finish()
             }
         }
@@ -728,11 +750,8 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
         show(intent)
     }
 
-    private var setUpWalletPinActivityResultLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {}
-
     override fun sendMessageToSupport() {
-        val recipient = Recipient.from(this, Address.fromSerialized(reportIssueBChatID), false)
+        val recipient = Recipient.from(this, Address.fromSerialized(REPORT_ISSUE_BCHAT_ID), false)
         val extras = Bundle()
         extras.putParcelable(ConversationFragmentV2.ADDRESS, recipient.address)
         val existingThread =
@@ -745,14 +764,8 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
 
     override fun onDestroy() {
         EventBus.getDefault().unregister(this@HomeActivity)
-
-        //Wallet
-        Timber.d("onDestroy")
+        Timber.d("onDestroy()")
         dismissProgressDialog()
-        //Important
-        //unregisterDetachReceiver()
-        //Ledger.disconnect()
-
         if(TextSecurePreferences.isWalletActive(this)) {
             if (CheckOnline.isOnline(this)) {
                 if (mBoundService != null && getWallet() != null) {
@@ -785,13 +798,6 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
         showOrHideFragment(ConversationFragmentV2(), extras, threadId)
     }
 
-    fun playVoiceMessageAtIndexIfPossible(indexInAdapter: Int) {
-        val fragment = supportFragmentManager.findFragmentById(R.id.activity_home_frame_layout_container)
-        if(fragment is ConversationFragmentV2) {
-            fragment.playVoiceMessageAtIndexIfPossible(indexInAdapter)
-        }
-    }
-
     override fun getSystemService(name: String): Any? {
         if (name == ActivityDispatcher.SERVICE) {
             return this
@@ -818,7 +824,6 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
     }
 
     //Wallet
-
     private var mBoundService: WalletService? = null
     private var mIsBound = false
 
@@ -902,7 +907,6 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
                 }
 
             }else{
-                val currentFragment = getCurrentFragment()
                 if (currentFragment is WalletFragment) {
                     currentFragment.updateNodeConnectingStatus()
                 }
@@ -927,18 +931,10 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
     override fun onSendRequest() {
         if(CheckOnline.isOnline(this)) {
             replaceFragment(SendFragment(),null, extras = null)
-            //replaceFragmentWithTransition(SendFragment(),null,null)
             uri = null // only use uri once
         }else{
             Toast.makeText(this, getString(R.string.please_check_your_internet_connection), Toast.LENGTH_SHORT).show()
         }
-    }
-
-    override fun onTxDetailsRequest(view: View?, info: TransactionInfo?) {
-        //Important
-        /*val args = Bundle()
-        args.putParcelable(TxFragment.ARG_INFO, info)
-        replaceFragment(TxFragment(), null, args)*/
     }
 
     private var synced = false
@@ -954,7 +950,6 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
 
     override fun onWalletReceive() {
         if(CheckOnline.isOnline(this)) {
-            //replaceFragmentWithTransition(ReceiveFragment(), null, null)
             replaceFragment(ReceiveFragment(),null,null)
         } else {
             Toast.makeText(this, getString(R.string.please_check_your_internet_connection), Toast.LENGTH_SHORT).show()
@@ -976,10 +971,6 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
         }
     }
 
-    override fun getStorageRoot(): File {
-        TODO("Not yet implemented")
-    }
-
     override fun getFavouriteNodes(): MutableSet<NodeInfo> {
         return favouriteNodes.toHashSet()
     }
@@ -990,10 +981,6 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
 
     override fun getOrPopulateFavouritesRemoteNodeList(context: Context, storeNodes: Boolean): MutableSet<NodeInfo> {
         return viewModel.getOrPopulateFavouritesRemoteNodeList(context, storeNodes)
-    }
-
-    override fun setFavouriteNodes(nodes: MutableCollection<NodeInfo>?) {
-        viewModel.setFavouriteNodes(nodes)
     }
 
     override fun getNode(): NodeInfo? {
@@ -1030,7 +1017,6 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
             walletManager.setDaemon(node)
             if (save) sharedPreferenceUtil.saveSelectedNode(getNode())
 
-            //SteveJosephh21
             startWalletService()
         }
     }
@@ -1166,15 +1152,11 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
                     getWallet()!!.disposePendingTransaction()
                     if(currentFragment is ConversationFragmentV2){
                         currentFragment.onCreateTransactionFailed(errorText)
-                    }/*else if(currentFragment is SendFragment){
-                        currentFragment.onCreateTransactionFailed(errorText)
-                    }*/
+                    }
                 } else {
                     if(currentFragment is ConversationFragmentV2){
                         currentFragment.onTransactionCreated("txTag", pendingTransaction)
-                    }/*else if(currentFragment is SendFragment){
-                        currentFragment.onTransactionCreated("txTag", pendingTransaction)
-                    }*/
+                    }
                 }
             }
         } catch (ex: ClassCastException) {
@@ -1193,9 +1175,7 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
             val currentFragment = getCurrentFragment()
             if(currentFragment is ConversationFragmentV2){
                 runOnUiThread { currentFragment.onTransactionSent(txId) }
-            }/*else if(currentFragment is SendFragment){
-                runOnUiThread { currentFragment.onTransactionSent(txId) }
-            }*/
+            }
         } catch (ex: ClassCastException) {
             // not in spend fragment
             Timber.d(ex.localizedMessage)
@@ -1258,22 +1238,14 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
         }
     }
 
-    override fun onWalletOpen(device: Wallet.Device?) {
-        //Important
-        /*if (device === Wallet.Device.Device_Ledger) {
-            runOnUiThread { showLedgerProgressDialog(LedgerProgressDialog.TYPE_RESTORE) }
-        }*/
-    }
-
     override fun onWalletFinish() {
         finish()
     }
 
     override fun onScanned(qrCode: String?): Boolean {
-        // #gurke
         val bcData = BarcodeData.fromString(qrCode)
         return if (bcData != null) {
-            popFragmentStack(null)
+            popFragmentStack()
             onUriScanned(bcData)
             true
         } else {
@@ -1288,7 +1260,7 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
     /// QR scanner callbacks
     override fun onScan() {
         if (Helper.getCameraPermission(this)) {
-            replaceFragmentWithTransition(ScannerFragment(),null,null)
+            replaceFragmentWithTransition(ScannerFragment(),"ScannerFragment")
         } else {
             Timber.i("Waiting for permissions")
         }
@@ -1347,15 +1319,11 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
     }
 
     override fun onFragmentDone() {
-        popFragmentStack(null)
+        popFragmentStack()
     }
 
-    private fun popFragmentStack(name: String?) {
-        if (name == null) {
-            supportFragmentManager.popBackStack()
-        } else {
-            supportFragmentManager.popBackStack(name, FragmentManager.POP_BACK_STACK_INCLUSIVE)
-        }
+    private fun popFragmentStack() {
+        supportFragmentManager.popBackStack()
     }
 
     override fun setOnUriScannedListener(onUriScannedListener: OnUriScannedListener?) {
@@ -1419,8 +1387,7 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
     override fun onWalletScan() {
         if(CheckOnline.isOnline(this)) {
             if (Helper.getCameraPermission(this)) {
-                val extras = Bundle()
-                replaceFragmentWithTransition(WalletScannerFragment(), null, extras)
+                replaceFragmentWithTransition(WalletScannerFragment(),"WalletScannerFragment")
             } else {
                 Timber.i("Waiting for permissions")
             }
@@ -1431,10 +1398,9 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
     }
 
     override fun onWalletScanned(qrCode: String?): Boolean {
-        // #gurke
         val bcData = BarcodeData.fromString(qrCode)
         return if (bcData != null) {
-            popFragmentStack(null)
+            popFragmentStack()
             onUriWalletScanned(bcData)
             true
         } else {
@@ -1467,9 +1433,7 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
 
     override fun onResume() {
         super.onResume()
-        Timber.d("onResume()-->")
-        //Important
-        //if (!Ledger.isConnected()) attachLedger()
+        Timber.d("onResume()")
         if(!CheckOnline.isOnline(this)){
             Toast.makeText(this,getString(R.string.please_check_your_internet_connection),Toast.LENGTH_SHORT).show()
         }
@@ -1491,7 +1455,7 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
         }
     }
 
-    fun saveWallet() {
+    private fun saveWallet() {
         if (mIsBound) { // no point in talking to unbound service
             var intent: Intent? = null
             if(intent==null) {
@@ -1516,17 +1480,10 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
     override fun onResumeFragments() {
         super.onResumeFragments()
         if (startScanFragment) {
-            startScanFragment()
+            replaceFragment(WalletScannerFragment(), null, null)
             startScanFragment = false
         }
     }
-
-    private fun startScanFragment() {
-        val extras = Bundle()
-        replaceFragment(WalletScannerFragment(), null, extras)
-    }
-
-
 
     override fun onRequestPermissionsResult(
         requestCode: Int,
@@ -1574,18 +1531,6 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
         }
     }
 
-    override fun setToolbarButton(type: Int) {
-        /*binding.toolbar.setButton(type)*/
-    }
-
-    override fun setSubtitle(title: String?) {
-        /* binding.toolbar.setSubtitle(subtitle)*/
-    }
-
-    override fun setTitle(titleId: Int) {
-
-    }
-
     override fun callToolBarRescan(){
         val dialog: AlertDialog.Builder = AlertDialog.Builder(this, R.style.BChatAlertDialog_Syncing_Option)
         val li = LayoutInflater.from(dialog.context)
@@ -1595,7 +1540,7 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
         val reConnect  = promptsView.findViewById<Button>(R.id.reConnectButton_Alert)
         val reScan = promptsView.findViewById<Button>(R.id.rescanButton_Alert)
         val alertDialog: AlertDialog = dialog.create()
-        alertDialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        alertDialog.window?.setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
         alertDialog.show()
 
         reConnect.setOnClickListener {
@@ -1682,7 +1627,6 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
             it.putExtra(WalletSettingComposeActivity.extraStartDestination, WalletSettingScreens.MyWalletSettingsScreen.route)
             walletSettingsResultLauncher.launch(it)
         }
-
     }
 
     private var walletSettingsResultLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -1692,26 +1636,20 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
     }
 
     private fun pingSelectedNode() {
-        val PING_SELECTED = 0
-        val FIND_BEST = 1
         AsyncFindBestNode(PING_SELECTED, FIND_BEST).execute<Int>(PING_SELECTED)
     }
 
-    inner class AsyncFindBestNode(val PING_SELECTED: Int, val FIND_BEST: Int) :
+    inner class AsyncFindBestNode(private val pingSelected: Int, private val findBest: Int) :
         AsyncTaskCoroutine<Int?, NodeInfo?>() {
-        override fun onPreExecute() {
-            super.onPreExecute()
-        }
 
         override fun doInBackground(vararg params: Int?): NodeInfo? {
             val favourites: Set<NodeInfo?> = getOrPopulateFavourites(this@HomeActivity)
             var selectedNode: NodeInfo?
-            if (params[0] == FIND_BEST) {
-                selectedNode = autoselect(favourites)
-            } else if (params[0] == PING_SELECTED) {
+            if (params[0] == findBest) {
+                selectedNode = autoSelect(favourites)
+            } else if (params[0] == pingSelected) {
                 selectedNode = getNode()
                 if (selectedNode == null) {
-                    Log.d("Beldex", "selected node null")
                     for (node in favourites) {
                         if (node!!.isSelected) {
                             selectedNode = node
@@ -1719,13 +1657,10 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
                         }
                     }
                 }
-                if (selectedNode == null) { // autoselect
-                    selectedNode = autoselect(favourites)
+                if (selectedNode == null) {
+                    selectedNode = autoSelect(favourites)
                 } else {
-                    //Steve Josephh21
-                    if(selectedNode!=null) {
-                        selectedNode!!.testRpcService()
-                    }
+                    selectedNode.testRpcService()
                 }
             } else throw java.lang.IllegalStateException()
             return if (selectedNode != null && selectedNode.isValid) {
@@ -1742,7 +1677,7 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
         }
     }
 
-    fun autoselect(nodes: Set<NodeInfo?>): NodeInfo? {
+    private fun autoSelect(nodes: Set<NodeInfo?>): NodeInfo? {
         if (nodes.isEmpty()) return null
         NodePinger.execute(nodes, null)
         val nodeList: ArrayList<NodeInfo?> = ArrayList<NodeInfo?>(nodes)
@@ -1752,27 +1687,29 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
     }
 
     override fun walletOnBackPressed(){
-        val fragment: Fragment = getCurrentFragment()!!
-        if (fragment is ConversationFragmentV2 || fragment is SendFragment || fragment is ReceiveFragment || fragment is ScannerFragment || fragment is WalletScannerFragment || fragment is WalletFragment) {
-            if (!(fragment as OnBackPressedListener).onBackPressed()) {
-                TextSecurePreferences.callFiatCurrencyApi(this,false)
-                if(fragment is ConversationFragmentV2){
-                    fragment.reactionDelegateDismiss()
-                    if(getIsReactionOverlayVisible(this)){
-                        setIsReactionOverlayVisible(this,false)
-                    }
-                }
-                try {
-                    onBackPressedDispatcher.onBackPressed()
-                }catch(e : IllegalStateException){
-                    replaceHomeFragment()
-                    println("clicked back arrow called 4")
-                }
+        val fragment = getCurrentFragment() ?: run {
+            onBackPressedDispatcher.onBackPressed()
+            return
+        }
+        if (fragment !is OnBackPressedListener) {
+            onBackPressedDispatcher.onBackPressed()
+            return
+        }
+        if (fragment.onBackPressed()) return
+        TextSecurePreferences.callFiatCurrencyApi(this, false)
+        if (fragment is ConversationFragmentV2) {
+            fragment.reactionDelegateDismiss()
+            if (getIsReactionOverlayVisible(this)) {
+                setIsReactionOverlayVisible(this, false)
             }
+        }
+        try {
+            onBackPressedDispatcher.onBackPressed()
+        } catch (e: IllegalStateException) {
+            replaceHomeFragment()
         }
     }
 
-    //SetDataAndType
     override fun passSharedMessageToConversationScreen(thread:Recipient) {
         val intent = Intent(this, MediaOverviewActivity::class.java)
         intent.putExtra(MediaOverviewActivity.ADDRESS_EXTRA, thread.address)
@@ -1802,59 +1739,45 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
         when (walletManager.networkType) {
             NetworkType.NetworkType_Mainnet -> {
                 viewModel.loadLegacyList(sharedPref.getString(prefDaemonMainNet, null))
-                sharedPref.edit().remove(prefDaemonMainNet).apply()
+                sharedPref.edit { remove(prefDaemonMainNet) }
             }
             NetworkType.NetworkType_Stagenet -> {
                 viewModel.loadLegacyList(sharedPref.getString(prefDaemonStageNet, null))
-                sharedPref.edit().remove(prefDaemonStageNet).apply()
+                sharedPref.edit { remove(prefDaemonStageNet) }
             }
             NetworkType.NetworkType_Testnet -> {
                 viewModel.loadLegacyList(sharedPref.getString(prefDaemonTestNet, null))
-                sharedPref.edit().remove(prefDaemonTestNet).apply()
+                sharedPref.edit { remove(prefDaemonTestNet) }
             }
             else -> throw java.lang.IllegalStateException("unsupported net " + walletManager.networkType)
         }
     }
 
     override fun onReactWithAnyEmojiDialogDismissed() {
-        val currentFragment = getCurrentFragment()
-        if(currentFragment is ConversationFragmentV2){
-            currentFragment.reactionDelegateDismiss()
-        }
+        val fragment = getCurrentFragment() as? ConversationFragmentV2 ?: return
+        fragment.reactionDelegateDismiss()
     }
 
-    override fun onReactWithAnyEmojiSelected(emoji : String, messageId : MessageId?) {
+    override fun onReactWithAnyEmojiSelected(emoji : String, messageId : MessageId) {
         try {
-            val currentFragment = getCurrentFragment()
-            if (currentFragment is ConversationFragmentV2) {
-                currentFragment.reactionDelegateDismiss()
-            }
-            val message=if (messageId!!.mms) {
+            val fragment = getCurrentFragment() as? ConversationFragmentV2
+            fragment?.reactionDelegateDismiss()
+            val message=if (messageId.mms) {
                 mmsDb.getMessageRecords(messageId.id)
             } else {
                 smsDb.getMessageRecords(messageId.id)
-            }
-            if (message != null) {
-                val localUser = textSecurePreferences.getLocalNumber()
-                val userReactions = reactionDb.getReactions(messageId).filter { it.author == localUser }
-                val isAlreadyReacted = userReactions.isNotEmpty()
-                if (isAlreadyReacted && userReactions.any { it.emoji == emoji }) {
-                    if (currentFragment is ConversationFragmentV2) {
-                        userReactions.forEach {
-                            currentFragment.sendEmojiRemoval(it.emoji, message)
-                        }
-                    }
-                } else {
-                    if (isAlreadyReacted) {
-                        if (currentFragment is ConversationFragmentV2) {
-                            userReactions.forEach {
-                                currentFragment.sendEmojiRemoval(it.emoji, message)
-                            }
-                        }
-                    }
-                    if (currentFragment is ConversationFragmentV2) {
-                        currentFragment.sendEmojiReaction(emoji, message)
-                    }
+            } ?: return
+
+            val localUser = textSecurePreferences.getLocalNumber()
+            val userReactions = reactionDb.getReactions(messageId).filter { it.author == localUser }
+            val hasSameEmoji = userReactions.any { it.emoji == emoji }
+            fragment?.run {
+                userReactions.forEach {
+                    sendEmojiRemoval(it.emoji, message)
+                }
+
+                if (!hasSameEmoji) {
+                    sendEmojiReaction(emoji, message)
                 }
             }
         } catch (e : NoSuchMessageException) {
@@ -1865,21 +1788,13 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
     }
 
     override fun onReactionSelected(messageRecord : MessageRecord, emoji : String) {
-        val currentFragment = getCurrentFragment()
-        if(currentFragment is ConversationFragmentV2){
-            currentFragment.reactionDelegateDismiss()
-        }
+        val fragment = getCurrentFragment() as? ConversationFragmentV2 ?: return
+        fragment.reactionDelegateDismiss()
         val oldRecord = messageRecord.reactions.find { it.author == textSecurePreferences.getLocalNumber() }
-        if (oldRecord != null && oldRecord.emoji == emoji) {
-            if(currentFragment is ConversationFragmentV2){
-                currentFragment.sendEmojiRemoval(emoji, messageRecord)
-            }
+        if(oldRecord?.emoji == emoji) {
+            fragment.sendEmojiRemoval(emoji, messageRecord)
         } else {
-            if (emoji != null) {
-                if(currentFragment is ConversationFragmentV2){
-                    currentFragment.sendEmojiReaction(emoji, messageRecord)
-                }
-            }
+            fragment.sendEmojiReaction(emoji, messageRecord)
         }
     }
 
@@ -1887,14 +1802,14 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
         messageRecord : MessageRecord,
         hasAddedCustomEmoji : Boolean
     ) {
-        val currentFragment = getCurrentFragment()
-        val oldRecord = messageRecord.reactions.find { record -> record.author == textSecurePreferences.getLocalNumber() }
+        val fragment = getCurrentFragment() as? ConversationFragmentV2
+        val localAuthor = textSecurePreferences.getLocalNumber()
+        val oldRecord = messageRecord.reactions.find {it.author == localAuthor}
         if (oldRecord != null && hasAddedCustomEmoji) {
-            if(currentFragment is ConversationFragmentV2){
-                currentFragment.reactionDelegateDismiss()
-                currentFragment.sendEmojiRemoval(oldRecord.emoji, messageRecord)
+            fragment?.run {
+                reactionDelegateDismiss()
+                sendEmojiRemoval(oldRecord.emoji, messageRecord)
             }
-
         } else {
             reactionDelegate.hideForReactWithAny()
             ReactWithAnyEmojiDialogFragment
@@ -1904,16 +1819,14 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
     }
 
     override fun onRemoveReaction(emoji : String, messageId : MessageId) {
-        val currentFragment = getCurrentFragment()
+        val fragment = getCurrentFragment() as? ConversationFragmentV2 ?: return
         try {
             val message = if (messageId.mms) {
                 mmsDb.getMessageRecords(messageId.id)
             } else {
                 smsDb.getMessageRecords(messageId.id)
-            }
-            if (message != null && currentFragment is ConversationFragmentV2) {
-                currentFragment.sendEmojiRemoval(emoji, message)
-            }
+            } ?: return
+            fragment.sendEmojiRemoval(emoji, message)
         } catch (e: NoSuchMessageException) {
             Log.e("onRemoveReaction", "Message not found: ${messageId.id}", e)
         } catch (e: Exception) {
@@ -1922,14 +1835,9 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
     }
 
     override fun onClearAll(emoji : String, messageId : MessageId) {
-        val currentFragment = getCurrentFragment()
+        val fragment = getCurrentFragment() as? ConversationFragmentV2
         reactionDb.deleteEmojiReactions(emoji, messageId)
-        if(currentFragment is ConversationFragmentV2){
-            currentFragment.clearAllReaction(emoji, messageId)
-        }
-
-
-
+        fragment?.clearAllReaction(emoji, messageId)
     }
 }
 //endregion

@@ -246,7 +246,7 @@ public final class ReactWithAnyEmojiDialogFragment extends BottomSheetDialogFrag
   public interface Callback {
     void onReactWithAnyEmojiDialogDismissed();
 
-    void onReactWithAnyEmojiSelected(@NonNull String emoji, MessageId messageId);
+    void onReactWithAnyEmojiSelected(@NonNull String emoji, @NonNull MessageId messageId);
   }
 
   private class SearchCallbacks implements KeyboardPageSearchView.Callbacks {

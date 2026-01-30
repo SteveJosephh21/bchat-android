@@ -831,6 +831,7 @@
     <string name="activity_edit_closed_group_group_name_missing_error" translatable="false">Group name can\'t be empty</string>
     <string name="activity_edit_closed_group_group_name_too_long_error" translatable="false">Please enter a shorter group name</string>
     <string name="activity_edit_closed_group_not_enough_group_members_error" translatable="false">Groups must have at least 1 group member</string>
+    <string name="activity_edit_closed_group_group_name_invalid_start_char_error">Enter a valid group name</string>
 
     <string name="fragment_edit_group_bottom_sheet_remove" translatable="false">Remove user from group</string>
 
@@ -874,6 +875,7 @@
     <string name="activity_prompt_passphrase_tap_to_unlock" translatable="false">Tap to Unlock</string>
 
     <string name="fragment_user_details_bottom_sheet_edit_text_hint" translatable="false">Enter a nickname</string>
+    <string name="fragment_user_details_bottom_sheet_nick_name_invalid_start_char_error">Enter a valid nickname</string>
     <string name="invalid_public_key" translatable="false">Invalid public key</string>
 
     <string name="document" translatable="false">Document</string>

@@ -10,6 +10,7 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
 import androidx.lifecycle.ViewModelProvider
@@ -31,6 +32,7 @@ import io.beldex.bchat.contacts.SelectContactsActivity
 import io.beldex.bchat.databinding.ActivityEditClosedGroupBinding
 import io.beldex.bchat.dependencies.DatabaseComponent
 import io.beldex.bchat.util.Helper
+import io.beldex.bchat.util.Utils
 import io.beldex.bchat.util.fadeIn
 import io.beldex.bchat.util.fadeOut
 import io.beldex.bchat.wallet.CheckOnline
@@ -81,13 +83,13 @@ class EditClosedGroupActivity : PassphraseRequiredActionBarActivity() {
     companion object {
         @JvmStatic val groupIDKey = "groupIDKey"
         @JvmStatic val recipient = "recipient"
-        private val loaderID = 0
-        val addUsersRequestCode = 124
-        val legacyGroupSizeLimit = 10
+        private const val LOADER_ID = 0
+        const val ADD_USERS_REQUEST_CODE = 124
+        const val LEGACY_GROUP_SIZE_LIMIT = 10
     }
-    var applyChangesButtonLastClickTime: Long = 0
+    private var applyChangesButtonLastClickTime: Long = 0
 
-    var secretGroupInfoViewModel: SecretGroupInfoViewModel? =  null
+    private var secretGroupInfoViewModel: SecretGroupInfoViewModel? =  null
 
     // region Lifecycle
     override fun onCreate(savedInstanceState: Bundle?, isReady: Boolean) {
@@ -164,7 +166,7 @@ class EditClosedGroupActivity : PassphraseRequiredActionBarActivity() {
             }
         }
 
-        LoaderManager.getInstance(this).initLoader(loaderID, null, object : LoaderManager.LoaderCallbacks<GroupMembers> {
+        LoaderManager.getInstance(this).initLoader(LOADER_ID, null, object : LoaderManager.LoaderCallbacks<GroupMembers> {
 
             override fun onCreateLoader(id: Int, bundle: Bundle?): Loader<GroupMembers> {
                 return EditClosedGroupLoader(this@EditClosedGroupActivity, groupID)
@@ -173,7 +175,7 @@ class EditClosedGroupActivity : PassphraseRequiredActionBarActivity() {
             override fun onLoadFinished(loader: Loader<GroupMembers>, groupMembers: GroupMembers) {
                 // We no longer need any subsequent loading events
                 // (they will occur on every activity resume).
-                LoaderManager.getInstance(this@EditClosedGroupActivity).destroyLoader(loaderID)
+                LoaderManager.getInstance(this@EditClosedGroupActivity).destroyLoader(LOADER_ID)
 
                 members.clear()
                 members.addAll(groupMembers.members.toHashSet())
@@ -230,7 +232,7 @@ class EditClosedGroupActivity : PassphraseRequiredActionBarActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         when (requestCode) {
-            addUsersRequestCode -> {
+            ADD_USERS_REQUEST_CODE -> {
                 if (resultCode != RESULT_OK) return
                 if (data == null || data.extras == null || !data.hasExtra(SelectContactsActivity.selectedContactsKey)) return
 
@@ -321,19 +323,28 @@ class EditClosedGroupActivity : PassphraseRequiredActionBarActivity() {
     private fun onAddMembersClick() {
         val intent = Intent(this@EditClosedGroupActivity, SelectContactsActivity::class.java)
         intent.putExtra(SelectContactsActivity.usersToExcludeKey, allMembers.toTypedArray())
-        startActivityForResult(intent, addUsersRequestCode)
+        startActivityForResult(intent, ADD_USERS_REQUEST_CODE)
     }
 
     private fun saveName() {
         val name = binding.edtGroupName.text.toString().trim()
-        if (name.isEmpty()) {
-            return Toast.makeText(this, R.string.activity_edit_closed_group_group_name_missing_error, Toast.LENGTH_SHORT).show()
-        }
-        if (name.length >= 26) {
-            return Toast.makeText(this, R.string.activity_edit_closed_group_group_name_too_long_error, Toast.LENGTH_SHORT).show()
-        }
-        if(name == originalName){
-            return Toast.makeText(this, R.string.activity_edit_closed_group_group_name_same_name_error,Toast.LENGTH_SHORT).show()
+        when {
+            name.isEmpty() -> {
+                Utils.showToast(this, R.string.activity_edit_closed_group_group_name_missing_error)
+                return
+            }
+            !name.matches(Utils.namePattern.toRegex()) -> {
+                Utils.showToast(this, R.string.activity_edit_closed_group_group_name_invalid_start_char_error)
+                return
+            }
+            name.length > 25 -> {
+                Utils.showToast(this, R.string.activity_edit_closed_group_group_name_too_long_error)
+                return
+            }
+            name == originalName -> {
+                Utils.showToast(this, R.string.activity_edit_closed_group_group_name_same_name_error)
+                return
+            }
         }
         this.name = name
         binding.lblGroupNameDisplay.text = name
@@ -373,7 +384,7 @@ class EditClosedGroupActivity : PassphraseRequiredActionBarActivity() {
             return Toast.makeText(this, R.string.activity_edit_closed_group_not_enough_group_members_error, Toast.LENGTH_LONG).show()
         }
 
-        val maxGroupMembers = if (isClosedGroup) groupSizeLimit else legacyGroupSizeLimit
+        val maxGroupMembers = if (isClosedGroup) groupSizeLimit else LEGACY_GROUP_SIZE_LIMIT
         if (members.size >= maxGroupMembers) {
             return Toast.makeText(this, R.string.activity_create_closed_group_too_many_group_members_error, Toast.LENGTH_LONG).show()
         }

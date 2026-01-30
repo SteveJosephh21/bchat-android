@@ -254,7 +254,7 @@ class NodeViewModel @Inject constructor(
             val favourites : Set<NodeInfo> =getOrPopulateFavourites(context)
             var selectedNode : NodeInfo?
             if (params[0] == findbest) {
-                selectedNode=autoselect(favourites)
+                selectedNode=autoSelect(favourites)
             } else if (params[0] == pingSelected) {
                 selectedNode=getNode()
                 if (!_favouritesNodes.value!!.contains(selectedNode)) selectedNode=null // it's not in the favourites (any longer)
@@ -267,7 +267,7 @@ class NodeViewModel @Inject constructor(
                     }
                 }
                 selectedNode?.testRpcService() ?: run {
-                    selectedNode=autoselect(favourites)
+                    selectedNode=autoSelect(favourites)
                 }
             } else {
                 throw IllegalStateException()
@@ -282,7 +282,7 @@ class NodeViewModel @Inject constructor(
         }
     }
 
-    fun autoselect(nodes : Set<NodeInfo?>?) : NodeInfo? {
+    private fun autoSelect(nodes : Set<NodeInfo?>?) : NodeInfo? {
         if (nodes?.isEmpty() == true) return null
         NodePinger.execute(nodes, null)
         val nodeList : List<NodeInfo> =java.util.ArrayList<NodeInfo>(nodes)
