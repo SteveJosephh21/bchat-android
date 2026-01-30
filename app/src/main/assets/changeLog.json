@@ -575,6 +575,14 @@
           "description":"Minor Bug fixes"
         }
       ]
+    },
+    {
+      "title": "2.9.3",
+      "descriptions": [
+        {
+          "description":"Removed wallet feature"
+        }
+      ]
     }
   ]
 }

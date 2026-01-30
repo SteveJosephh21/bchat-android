@@ -1025,12 +1025,13 @@ class ConversationFragmentV2 : BaseFragment(), InputBarDelegate,
     }
 
     private fun showPayWithSlide(thread : Recipient?, status : Boolean) {
-        if (thread != null && !thread.isGroupRecipient && thread.hasApprovedMe() && !thread.isBlocked && thread.isApproved && HomeActivity.reportIssueBChatID != thread.address.toString() && !thread.isLocalNumber && status) {
+        /*if (thread != null && !thread.isGroupRecipient && thread.hasApprovedMe() && !thread.isBlocked && thread.isApproved && HomeActivity.reportIssueBChatID != thread.address.toString() && !thread.isLocalNumber && status) {
             binding.slideToPayButton.visibility=View.VISIBLE
             selectedEvent?.let { dispatchTouchEvents(it) }
         } else {
             binding.slideToPayButton.visibility=View.GONE
-        }
+        }*/
+        binding.slideToPayButton.visibility=View.GONE
     }
 
     private fun callShowPayAsYouChatBDXIcon(thread : Recipient?) {

@@ -256,7 +256,7 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
         NavigationItemModel(R.drawable.ic_notification_outline, "Notification",0),
         NavigationItemModel(R.drawable.ic_msg_rqst_outline, "Message Requests",0),
         NavigationItemModel(R.drawable.ic_recovery_seed_outline, "Recovery Seed",0),
-        NavigationItemModel(R.drawable.ic_wallet_outline, "Wallet",R.drawable.ic_beta),
+        //NavigationItemModel(R.drawable.ic_wallet_outline, "Wallet",R.drawable.ic_beta),
         NavigationItemModel(R.drawable.ic_report_issue_outline,"Report Issue",0),
         NavigationItemModel(R.drawable.ic_help_outline, "Help",0),
         NavigationItemModel(R.drawable.ic_invite_outline, "Invite",0),
@@ -422,7 +422,7 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
                         // # Recovery Seed Activity
                         showSeed()
                     }
-                    4 -> {
+                    /*4 -> {
                         // # My Wallet Activity
                         if (CheckOnline.isOnline(requireActivity().applicationContext)) {
                             if (TextSecurePreferences.isWalletActive(requireContext())) {
@@ -433,27 +433,27 @@ class HomeFragment : BaseFragment(),ConversationClickListener,
                         } else {
                             Toast.makeText(requireActivity().applicationContext, getString(R.string.please_check_your_internet_connection), Toast.LENGTH_SHORT).show()
                         }
-                    }
-                    5 -> {
+                    }*/
+                    4 -> {
                         // # Support
                         activityCallback?.sendMessageToSupport()
                         binding.drawerLayout.closeDrawer(GravityCompat.END)
                     }
-                    6 -> {
+                    5 -> {
                         // # Help Activity
                         help()
                     }
-                    7 -> {
+                    6 -> {
                         // # Invite Activity
                         sendInvitation(hexEncodedPublicKey)
                     }
-                    8 -> {
+                    7 -> {
                         // # About Activity
                         showAbout()
                     }
                 }
                 // Don't highlight the 'Profile' and 'Like us on Facebook' item row
-                if (position != 5 && position != 3) {
+                if (position != 4 && position != 3) {
                     updateAdapter(position)
                 }
                 Handler(Looper.getMainLooper()).postDelayed({

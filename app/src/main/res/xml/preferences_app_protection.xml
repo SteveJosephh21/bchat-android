@@ -34,6 +34,7 @@
 
     <PreferenceCategory android:title="@string/preferences_wallet_title"
         app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
         app:layout="@layout/preference_layout_header">
 
         <io.beldex.bchat.components.SwitchPreferenceCompat

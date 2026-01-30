@@ -1109,7 +1109,7 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
     }
 
     override fun onWalletStored(success: Boolean) {
-        runOnUiThread {
+       /* runOnUiThread {
             if (success) {
                 Toast.makeText(
                     this@HomeActivity,
@@ -1123,7 +1123,7 @@ class HomeActivity : PassphraseRequiredActionBarActivity(),SeedReminderViewDeleg
                     Toast.LENGTH_LONG
                 ).show()
             }
-        }
+        }*/
     }
 
     override fun onTransactionCreated(tag: String?, pendingTransaction: PendingTransaction?) {
